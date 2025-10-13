@@ -1,6 +1,7 @@
 "use client";
 export const dynamic = "force-dynamic";
 
+import EnsureSummary from "@/components/EnsureSummary";
 import NextDynamic from "next/dynamic";
 import { collection, onSnapshot, query } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
@@ -12,9 +13,7 @@ import VenueCard from "@/components/VenueCard";
 import { weight } from "@/lib/heat";
 
 // Map only on client
-const MapView = NextDynamic(() => import("@/components/MapView"), {
-  ssr: false,
-});
+const MapView = NextDynamic(() => import("@/components/MapView"), { ssr: false });
 
 type Vote = {
   intent: "yes" | "maybe" | "no";
@@ -40,13 +39,8 @@ function haversineMeters(
 }
 
 export default function TonightPage() {
-  const [tallies, setTallies] = useState<
-    Record<string, { voters: number; weighted: number }>
-  >({});
-  const [sentiment, setSentiment] = useState<{ yesMaybe: number; no: number }>({
-    yesMaybe: 0,
-    no: 0,
-  });
+  const [tallies, setTallies] = useState<Record<string, { voters: number; weighted: number }>>({});
+  const [sentiment, setSentiment] = useState<{ yesMaybe: number; no: number }>({ yesMaybe: 0, no: 0 });
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -83,12 +77,8 @@ export default function TonightPage() {
             }
             yesMaybe += 1;
 
-            const editedMs =
-              (v.lastEditedAt?.toMillis && v.lastEditedAt.toMillis()) || now;
-            const updatedAgoMinutes = Math.max(
-              1,
-              Math.round((now - editedMs) / 60000)
-            );
+            const editedMs = (v.lastEditedAt?.toMillis && v.lastEditedAt.toMillis()) || now;
+            const updatedAgoMinutes = Math.max(1, Math.round((now - editedMs) / 60000));
 
             for (const sel of v.selections || []) {
               const venue = VENUE_INDEX[sel.venueId];
@@ -139,65 +129,66 @@ export default function TonightPage() {
   }, [tallies]);
 
   const totalSentiment = sentiment.yesMaybe + sentiment.no;
-  const stayInPct =
-    totalSentiment > 0 ? Math.round((sentiment.no / totalSentiment) * 100) : 0;
+  const stayInPct = totalSentiment > 0 ? Math.round((sentiment.no / totalSentiment) * 100) : 0;
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Tonight in Ormskirk</h1>
+    <>
+      {/* Trigger immutable summary creation for yesterday if missing */}
+      <EnsureSummary />
 
-      {err ? (
-        <p className="text-sm rounded-xl border border-red-500/30 bg-red-500/10 text-red-200 p-3">
-          Live data error: {err}
-        </p>
-      ) : (
-        <p className="text-neutral-400 text-sm">
-          Live popularity based on local votes. Cast yours on the{" "}
-          <a href="/vote" className="underline">
-            Vote
-          </a>{" "}
-          page.
-        </p>
-      )}
+      <div className="space-y-4">
+        <h1 className="text-2xl font-semibold">Tonight in Ormskirk</h1>
 
-      {totalSentiment > 0 && (
-        <p className="text-sm text-neutral-300">
-          Crowd sentiment:{" "}
-          <span className="font-medium">{stayInPct}%</span> say they’re staying
-          in.
-        </p>
-      )}
+        {err ? (
+          <p className="text-sm rounded-xl border border-red-500/30 bg-red-500/10 text-red-200 p-3">
+            Live data error: {err}
+          </p>
+        ) : (
+          <p className="text-neutral-400 text-sm">
+            Live popularity based on local votes. Cast yours on the{" "}
+            <a href="/vote" className="underline">
+              Vote
+            </a>{" "}
+            page.
+          </p>
+        )}
 
-      <MapView topVenueId={topVenueId} />
+        {totalSentiment > 0 && (
+          <p className="text-sm text-neutral-300">
+            Crowd sentiment: <span className="font-medium">{stayInPct}%</span> say they’re staying in.
+          </p>
+        )}
 
-      <div className="grid gap-3">
-        {VENUES.map((v) => {
-          const t = tallies[v.id] || { voters: 0, weighted: 0 };
-          // Bars start empty until there are votes
-          const score0to100 =
-            t.voters === 0 ? 0 : Math.min(100, Math.round(t.weighted * 10));
+        <MapView topVenueId={topVenueId} />
 
-          return (
-            <VenueCard
-             key={v.id}
-             id={v.id}
-             name={v.name}
-             voters={t.voters}
-             heatScore={score0to100}
-             lat={v.lat}                 // ⬅️ add
-             lng={v.lng}                 // ⬅️ add
-            />
-          );
-        })}
+        <div className="grid gap-3">
+          {VENUES.map((v) => {
+            const t = tallies[v.id] || { voters: 0, weighted: 0 };
+            // Bars start empty until there are votes
+            const score0to100 = t.voters === 0 ? 0 : Math.min(100, Math.round(t.weighted * 10));
+
+            return (
+              <VenueCard
+                key={v.id}
+                id={v.id}
+                name={v.name}
+                voters={t.voters}
+                heatScore={score0to100}
+                lat={v.lat}
+                lng={v.lng}
+              />
+            );
+          })}
+        </div>
+
+        {/* Floating Vote button for quick access */}
+        <a
+          href="/vote"
+          className="fixed bottom-5 right-5 px-4 py-2 rounded-xl bg-yellow-400 text-black shadow-lg hover:opacity-90"
+        >
+          Vote tonight
+        </a>
       </div>
-
-      {/* Floating Vote button for quick access */}
-      <a
-        href="/vote"
-        className="fixed bottom-5 right-5 px-4 py-2 rounded-xl bg-yellow-400 text-black shadow-lg hover:opacity-90"
-      >
-        Vote tonight
-      </a>
-    </div>
+    </>
   );
 }
