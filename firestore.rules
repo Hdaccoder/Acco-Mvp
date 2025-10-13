@@ -1,0 +1,123 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Helpers ----------
+    function isSignedIn() {
+      return request.auth != null
+    }
+
+    function isSelf(userId) {
+      return isSignedIn() && request.auth.uid == userId
+    }
+
+    // Allow null, else basic lat/lng/accuracy checks
+    function validLocation(loc) {
+      return loc == null ||
+        (
+          loc is map &&
+          loc.lat is number && loc.lat >= -90 && loc.lat <= 90 &&
+          loc.lng is number && loc.lng >= -180 && loc.lng <= 180 &&
+          (loc.accuracy == null || loc.accuracy is number)
+        )
+    }
+
+    // One selection entry
+    function validSelection(sel) {
+      return sel is map &&
+             sel.venueId is string &&
+             (sel.arrivalWindow == null || sel.arrivalWindow is string)
+    }
+
+    // Non-recursive validator for selections list (supports up to 8)
+    function validSelections(arr) {
+      return arr is list &&
+             arr.size() <= 8 &&
+             (
+               arr.size() == 0 ||
+               (validSelection(arr[0]) &&
+                 (arr.size() == 1 ||
+                 (validSelection(arr[1]) &&
+                   (arr.size() == 2 ||
+                   (validSelection(arr[2]) &&
+                     (arr.size() == 3 ||
+                     (validSelection(arr[3]) &&
+                       (arr.size() == 4 ||
+                       (validSelection(arr[4]) &&
+                         (arr.size() == 5 ||
+                         (validSelection(arr[5]) &&
+                           (arr.size() == 6 ||
+                           (validSelection(arr[6]) &&
+                             (arr.size() == 7 ||
+                             validSelection(arr[7])
+                             ))
+                           ))
+                         ))
+                       ))
+                     ))
+                   ))
+                 ))
+             )
+    }
+
+    // Validate the vote document shape and ownership
+    function validVote(doc, userId) {
+      return
+        // only allowed fields
+        doc.keys().hasOnly(['userId','intent','selections','location','lastEditedAt']) &&
+
+        // ownership must match both auth uid and path uid
+        doc.userId is string &&
+        request.auth != null &&
+        doc.userId == request.auth.uid &&
+        doc.userId == userId &&
+
+        // intent
+        (doc.intent in ['yes','maybe','no']) &&
+
+        // selections list (can be empty for "no")
+        validSelections(doc.selections) &&
+
+        // location optional
+        validLocation(doc.location) &&
+
+        // timestamp present
+        (doc.lastEditedAt is timestamp)
+    }
+
+    // ---------- Votes: nights/{YYYYMMDD}/votes/{userId} ----------
+    match /nights/{date}/votes/{userId} {
+
+      // Public reads for the Tonight page
+      allow read: if true
+
+      // Owner can create/update; one doc per user per night (path enforces uniqueness)
+      allow create, update: if isSelf(userId) && validVote(request.resource.data, userId)
+
+      // No client deletes
+      allow delete: if false
+    }
+
+    // Optional: server-written tallies (public read, no client writes)
+    match /nights/{date}/venueTallies/{venueId} {
+      allow read: if true
+      allow write: if false
+    }
+
+    // Venues catalogue: public read, no client writes
+    match /venues/{venueId} {
+      allow read: if true
+      allow write: if false
+    }
+
+    // Optional user profiles
+    match /users/{userId} {
+      allow read, write: if isSelf(userId)
+    }
+
+    // Everything else denied
+    match /{document=**} {
+      allow read, write: if false
+    }
+  }
+}
