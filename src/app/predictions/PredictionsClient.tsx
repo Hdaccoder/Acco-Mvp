@@ -29,15 +29,14 @@ export default function PredictionsClient() {
           setErr("Database not initialised. Check your .env.local values.");
           return;
         }
-        // Narrow db to non-null for Firestore helpers
         const fdb = db as Firestore;
 
-        // 1) Load all night doc IDs, take last ~56 (8 weeks)
+        // 1) Load all night doc IDs and take last ~56 (8 weeks)
         const nightsSnap = await getDocs(collection(fdb, "nights"));
         const ids = nightsSnap.docs
           .map((d) => d.id)
           .filter((k) => /^\d{8}$/.test(k))
-          .sort(); // YYYYMMDD lexicographic sort
+          .sort();
         const lastKeys = ids.slice(-56);
 
         // 2) Fetch their summaries
@@ -48,7 +47,6 @@ export default function PredictionsClient() {
         }> = [];
 
         for (const k of lastKeys) {
-          // Document named "summary" under the night's doc
           const sRef = doc(fdb, "nights", k, "summary");
           const s = await getDoc(sRef);
           if (!s.exists()) continue;
@@ -59,6 +57,7 @@ export default function PredictionsClient() {
             +k.slice(4, 6) - 1,
             +k.slice(6, 8)
           );
+
           summaries.push({
             dateKey: k,
             weekday: dt.getDay(),
@@ -68,14 +67,9 @@ export default function PredictionsClient() {
 
         // 3) Optional live boost from today's votes
         const today = new Date();
-        const tk = `${today.getFullYear()}${String(
-          today.getMonth() + 1
-        ).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
+        const tk = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
 
-        const todayVotesSnap = await getDocs(
-          collection(fdb, "nights", tk, "votes")
-        );
-
+        const todayVotesSnap = await getDocs(collection(fdb, "nights", tk, "votes"));
         const todayLive: Record<string, { yes: number; maybe: number }> = {};
         for (const v of VENUES) todayLive[v.id] = { yes: 0, maybe: 0 };
 
@@ -99,7 +93,24 @@ export default function PredictionsClient() {
   }, []);
 
   if (err) {
-    return <div className="p-4 text-red-300">Prediction error: {err}</div>;
+    const mailto =
+      "mailto:paul.is.in.power@gmail.com" +
+      "?subject=" +
+      encodeURIComponent("Acco predictions error") +
+      "&body=" +
+      encodeURIComponent(
+        `Error message: ${err}\n\nWhat were you doing when this happened?\n\nDevice/Browser (optional):\n\nScreenshot link (optional):`
+      );
+
+    return (
+      <div className="p-4 text-red-300">
+        Prediction error: {err}{" "}
+        <a href={mailto} className="underline">
+          Report issue
+        </a>
+        .
+      </div>
+    );
   }
 
   if (!preds) {
@@ -110,8 +121,7 @@ export default function PredictionsClient() {
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Tonight’s Predictions</h1>
       <p className="text-sm text-neutral-400">
-        Blended model using recent trend (EMA), same-weekday pattern, and early
-        votes.
+        Blended model using recent trend (EMA), same-weekday pattern, and early votes.
       </p>
 
       <div className="space-y-3">
@@ -140,12 +150,29 @@ export default function PredictionsClient() {
             </div>
 
             <div className="mt-2 text-xs text-neutral-500">
-              EMA {p.ema.toFixed(1)} · DOW {p.dowMean.toFixed(1)} · Live{" "}
-              {p.live.toFixed(1)}
+              EMA {p.ema.toFixed(1)} · DOW {p.dowMean.toFixed(1)} · Live {p.live.toFixed(1)}
             </div>
           </div>
         ))}
       </div>
+
+      <p className="text-xs text-neutral-500">
+        Questions or found a bug?{" "}
+        <a
+          className="underline"
+          href={
+            "mailto:paul.is.in.power@gmail.com" +
+            "?subject=" +
+            encodeURIComponent("Acco predictions feedback") +
+            "&body=" +
+            encodeURIComponent("Your feedback:")
+          }
+        >
+          Email us
+        </a>
+        .
+      </p>
     </div>
   );
 }
+
