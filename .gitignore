@@ -67,3 +67,12 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+
+# Node/Next
+node_modules/
+.next/
+out/
+dist/
+*.log
+.env*
+!.env.example
