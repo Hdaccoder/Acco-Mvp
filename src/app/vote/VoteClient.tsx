@@ -3,6 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { ensureAnon } from "@/lib/auth";
@@ -12,19 +13,18 @@ import { useUserLocation } from "@/hooks/useUserLocation";
 
 const WINDOWS = ["20-21", "21-22", "22-23", "23-24"] as const;
 
-type Props = {
-  initialVenue: string | null;
-};
+type Props = { initialVenue: string | null };
 
 export default function VoteClient({ initialVenue }: Props) {
+  const router = useRouter();
   const [uid, setUid] = useState<string | null>(null);
   const [intent, setIntent] = useState<"yes" | "maybe" | "no">("yes");
   const [selected, setSelected] = useState<string[]>([]);
   const [windowSel, setWindowSel] = useState<string>(WINDOWS[1]);
   const { loc, error: locError } = useUserLocation();
   const [err, setErr] = useState<string | null>(null);
-  const [okMsg, setOkMsg] = useState<string | null>(null);
 
+  // sign in anonymously
   useEffect(() => {
     let active = true;
     (async () => {
@@ -37,11 +37,10 @@ export default function VoteClient({ initialVenue }: Props) {
     };
   }, []);
 
-  // Preselect from query param passed by the server page
+  // preselect via ?venue=... from the server page
   useEffect(() => {
     if (!initialVenue) return;
-    const exists = VENUES.some((v) => v.id === initialVenue);
-    if (!exists) return;
+    if (!VENUES.some((v) => v.id === initialVenue)) return;
     setIntent((prev) => (prev === "no" ? "yes" : prev));
     setSelected((prev) =>
       prev.includes(initialVenue) ? prev : [...prev, initialVenue]
@@ -52,22 +51,20 @@ export default function VoteClient({ initialVenue }: Props) {
 
   async function submit() {
     setErr(null);
-    setOkMsg(null);
 
     if (!uid) {
-      setErr("You’re not signed in yet. Please wait a moment and try again.");
+      setErr("You’re not signed in yet. Please wait and try again.");
       return;
     }
     if (!db) {
-      setErr(
-        "Database not initialised. Check your .env.local values and restart the server."
-      );
+      setErr("Database not initialised (check .env on the server).");
       return;
     }
 
     try {
       const nk = nightKey();
 
+      // “No” vote — counts towards stay-in signal
       if (intent === "no") {
         await setDoc(
           doc(db, "nights", nk, "votes", uid),
@@ -80,7 +77,7 @@ export default function VoteClient({ initialVenue }: Props) {
           },
           { merge: true }
         );
-        setOkMsg("✅ Counted: you’re not going out tonight.");
+        router.push("/");              // ⬅️ redirect to home
         return;
       }
 
@@ -106,7 +103,8 @@ export default function VoteClient({ initialVenue }: Props) {
         },
         { merge: true }
       );
-      setOkMsg("✅ Thanks! Your vote was recorded.");
+
+      router.push("/");                // ⬅️ redirect to home
     } catch (e: any) {
       setErr(e?.message || String(e));
     }
@@ -117,24 +115,13 @@ export default function VoteClient({ initialVenue }: Props) {
       <h1 className="text-2xl font-semibold">Vote for tonight</h1>
 
       <p className="text-sm text-neutral-400">
-        Each account can submit <span className="font-medium">one vote</span> per night.
-        You can update it anytime — we keep your latest choice.
+        Each account can submit <span className="font-medium">one vote</span> per
+        night. You can update it anytime — we keep your latest choice.
       </p>
-
-      {!db && (
-        <p className="text-sm rounded-xl border border-yellow-500/30 bg-yellow-500/10 text-yellow-200 p-3">
-          Firebase isn’t initialised yet. Check your <code>.env.local</code> values.
-        </p>
-      )}
 
       {err && (
         <p className="text-sm rounded-xl border border-red-500/30 bg-red-500/10 text-red-200 p-3">
           {err}
-        </p>
-      )}
-      {okMsg && (
-        <p className="text-sm rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-200 p-3">
-          {okMsg}
         </p>
       )}
 

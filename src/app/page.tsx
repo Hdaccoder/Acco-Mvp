@@ -179,12 +179,13 @@ export default function TonightPage() {
 
           return (
             <VenueCard
-              key={v.id}
-              id={v.id}
-              name={v.name}
-              voters={t.voters}
-              heatScore={score0to100}
-              peakWindow={undefined}
+             key={v.id}
+             id={v.id}
+             name={v.name}
+             voters={t.voters}
+             heatScore={score0to100}
+             lat={v.lat}                 // ⬅️ add
+             lng={v.lng}                 // ⬅️ add
             />
           );
         })}

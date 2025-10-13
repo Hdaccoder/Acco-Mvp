@@ -1,5 +1,5 @@
 // src/app/vote/page.tsx
-export const dynamic = "force-dynamic"; // keep it dynamic so Next won't try to fully prerender
+export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 import { Suspense } from "react";

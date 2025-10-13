@@ -16,5 +16,7 @@ export const VENUES: Venue[] = [
 { id: "styles-bar", name: "Styles Bar", lat: 53.5692, lng: -2.8856, baseline: 5 },
 { id: "alpine-club-lodge", name: "Alpine Club Lodge", lat: 53.5681, lng: -2.8867, baseline: 5 },
 { id: "lime-tyger", name: "Lime Tyger", lat: 53.5690, lng: -2.8861, baseline: 5 },
-{ id: "edge-hill-su", name: "Edge Hill Student Union", lat: 53.5609, lng: -2.8723, baseline: 7 }
+{ id: "edge-hill-su", name: "Edge Hill Student Union", lat: 53.5609, lng: -2.8723, baseline: 7 },
+{ id: "cricketers", name: "The Cricketers", lat: 53.56841, lng: -2.87990 },
+{ id: "tap-room", name: "Tap Room",lat: 53.56990, lng: -2.88490 }
 ];
