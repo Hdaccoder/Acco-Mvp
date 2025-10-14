@@ -104,6 +104,27 @@ service cloud.firestore {
       allow write: if false
     }
 
+    // Allow reading the parent night documents (no client writes)
+  match /nights/{date} {
+    allow read: if true;
+    allow write: if false;
+    }
+
+
+    // ---------- Nightly immutable summary: nights/{YYYYMMDD}/summary ----------
+    // Anyone signed in can CREATE it once (if not already there). No updates/deletes.
+    match /nights/{date}/summary {
+      // Publicly readable so the site can show historical stats
+      allow read: if true
+
+      // Exactly-once creation per night
+      allow create: if isSignedIn()
+                    && !exists(/databases/$(database)/documents/nights/$(date)/summary)
+
+      // Immutable after creation
+      allow update, delete: if false
+    }
+
     // Venues catalogue: public read, no client writes
     match /venues/{venueId} {
       allow read: if true
