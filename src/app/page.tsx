@@ -13,7 +13,9 @@ import VenueCard from "@/components/VenueCard";
 import { weight } from "@/lib/heat";
 
 // Map only on client
-const MapView = NextDynamic(() => import("@/components/MapView"), { ssr: false });
+const MapView = NextDynamic(() => import("@/components/MapView"), {
+  ssr: false,
+});
 
 type Vote = {
   intent: "yes" | "maybe" | "no";
@@ -39,8 +41,12 @@ function haversineMeters(
 }
 
 export default function TonightPage() {
-  const [tallies, setTallies] = useState<Record<string, { voters: number; weighted: number }>>({});
-  const [sentiment, setSentiment] = useState<{ yesMaybe: number; no: number }>({ yesMaybe: 0, no: 0 });
+  const [tallies, setTallies] = useState<
+    Record<string, { voters: number; weighted: number }>
+  >({});
+  const [sentiment, setSentiment] = useState<{ yesMaybe: number; no: number }>(
+    { yesMaybe: 0, no: 0 }
+  );
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -77,8 +83,12 @@ export default function TonightPage() {
             }
             yesMaybe += 1;
 
-            const editedMs = (v.lastEditedAt?.toMillis && v.lastEditedAt.toMillis()) || now;
-            const updatedAgoMinutes = Math.max(1, Math.round((now - editedMs) / 60000));
+            const editedMs =
+              (v.lastEditedAt?.toMillis && v.lastEditedAt.toMillis()) || now;
+            const updatedAgoMinutes = Math.max(
+              1,
+              Math.round((now - editedMs) / 60000)
+            );
 
             for (const sel of v.selections || []) {
               const venue = VENUE_INDEX[sel.venueId];
@@ -119,76 +129,87 @@ export default function TonightPage() {
     };
   }, []);
 
-  // Compute the top venue by raw voter count (only if > 0)
-  const topVenueId = useMemo(() => {
-    let best: { id: string; voters: number } | null = null;
-    for (const [id, t] of Object.entries(tallies)) {
-      if (!best || t.voters > best.voters) best = { id, voters: t.voters };
-    }
-    return best && best.voters > 0 ? best.id : null;
+  // Compute podium (top 3 by raw voter count, > 0)
+  const podiumIds = useMemo(() => {
+    const entries = Object.entries(tallies)
+      .map(([id, t]) => ({ id, voters: t.voters }))
+      .filter((x) => x.voters > 0)
+      .sort((a, b) => b.voters - a.voters)
+      .slice(0, 3)
+      .map((x) => x.id);
+    return entries; // [gold, silver, bronze] if present
+  }, [tallies]);
+
+  // Sort the list by voters desc (keep original order for ties/zero)
+  const venuesSorted = useMemo(() => {
+    return [...VENUES].sort((a, b) => {
+      const va = tallies[a.id]?.voters ?? 0;
+      const vb = tallies[b.id]?.voters ?? 0;
+      if (vb !== va) return vb - va;
+      // Stable-ish fallback: by name
+      return a.name.localeCompare(b.name);
+    });
   }, [tallies]);
 
   const totalSentiment = sentiment.yesMaybe + sentiment.no;
-  const stayInPct = totalSentiment > 0 ? Math.round((sentiment.no / totalSentiment) * 100) : 0;
+  const stayInPct =
+    totalSentiment > 0 ? Math.round((sentiment.no / totalSentiment) * 100) : 0;
 
   return (
-    <>
-      {/* Trigger immutable summary creation for yesterday if missing */}
-      <EnsureSummary />
+    <div className="space-y-4">
+      <h1 className="text-2xl font-semibold">Tonight in Ormskirk</h1>
 
-      <div className="space-y-4">
-        <h1 className="text-2xl font-semibold">Tonight in Ormskirk</h1>
+      {err ? (
+        <p className="text-sm rounded-xl border border-red-500/30 bg-red-500/10 text-red-200 p-3">
+          Live data error: {err}
+        </p>
+      ) : (
+        <p className="text-neutral-400 text-sm">
+          Live popularity based on local votes. Cast yours on the{" "}
+          <a href="/vote" className="underline">
+            Vote
+          </a>{" "}
+          page.
+        </p>
+      )}
 
-        {err ? (
-          <p className="text-sm rounded-xl border border-red-500/30 bg-red-500/10 text-red-200 p-3">
-            Live data error: {err}
-          </p>
-        ) : (
-          <p className="text-neutral-400 text-sm">
-            Live popularity based on local votes. Cast yours on the{" "}
-            <a href="/vote" className="underline">
-              Vote
-            </a>{" "}
-            page.
-          </p>
-        )}
+      {totalSentiment > 0 && (
+        <p className="text-sm text-neutral-300">
+          Crowd sentiment:{" "}
+          <span className="font-medium">{stayInPct}%</span> say they’re staying
+          in.
+        </p>
+      )}
 
-        {totalSentiment > 0 && (
-          <p className="text-sm text-neutral-300">
-            Crowd sentiment: <span className="font-medium">{stayInPct}%</span> say they’re staying in.
-          </p>
-        )}
+      {/* pass podiumIds for gold/silver/bronze */}
+      <MapView podiumIds={podiumIds} />
 
-        <MapView topVenueId={topVenueId} />
-
-        <div className="grid gap-3">
-          {VENUES.map((v) => {
-            const t = tallies[v.id] || { voters: 0, weighted: 0 };
-            // Bars start empty until there are votes
-            const score0to100 = t.voters === 0 ? 0 : Math.min(100, Math.round(t.weighted * 10));
-
-            return (
-              <VenueCard
-                key={v.id}
-                id={v.id}
-                name={v.name}
-                voters={t.voters}
-                heatScore={score0to100}
-                lat={v.lat}
-                lng={v.lng}
-              />
-            );
-          })}
-        </div>
-
-        {/* Floating Vote button for quick access */}
-        <a
-          href="/vote"
-          className="fixed bottom-5 right-5 px-4 py-2 rounded-xl bg-yellow-400 text-black shadow-lg hover:opacity-90"
-        >
-          Vote tonight
-        </a>
+      <div className="grid gap-3">
+        {venuesSorted.map((v) => {
+          const t = tallies[v.id] || { voters: 0, weighted: 0 };
+          const score0to100 =
+            t.voters === 0 ? 0 : Math.min(100, Math.round(t.weighted * 10));
+          return (
+            <VenueCard
+              key={v.id}
+              id={v.id}
+              name={v.name}
+              voters={t.voters}
+              heatScore={score0to100}
+              lat={v.lat}
+              lng={v.lng}
+            />
+          );
+        })}
       </div>
-    </>
+
+      {/* Floating Vote button for quick access */}
+      <a
+        href="/vote"
+        className="fixed bottom-5 right-5 px-4 py-2 rounded-xl bg-yellow-400 text-black shadow-lg hover:opacity-90"
+      >
+        Vote tonight
+      </a>
+    </div>
   );
 }
