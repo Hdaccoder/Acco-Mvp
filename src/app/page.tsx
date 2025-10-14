@@ -129,24 +129,27 @@ export default function TonightPage() {
     };
   }, []);
 
-  // Compute podium (top 3 by raw voter count, > 0)
+  // Podium by HEAT (weighted), fallback by voters
   const podiumIds = useMemo(() => {
     const entries = Object.entries(tallies)
-      .map(([id, t]) => ({ id, voters: t.voters }))
-      .filter((x) => x.voters > 0)
-      .sort((a, b) => b.voters - a.voters)
+      .map(([id, t]) => ({ id, weighted: t.weighted, voters: t.voters }))
+      .filter((x) => x.weighted > 0)
+      .sort((a, b) => {
+        if (b.weighted !== a.weighted) return b.weighted - a.weighted;
+        return b.voters - a.voters;
+      })
       .slice(0, 3)
       .map((x) => x.id);
-    return entries; // [gold, silver, bronze] if present
+    return entries;
   }, [tallies]);
 
-  // Sort the list by voters desc (keep original order for ties/zero)
+  // Sort cards by HEAT first, then voters, then name
   const venuesSorted = useMemo(() => {
     return [...VENUES].sort((a, b) => {
-      const va = tallies[a.id]?.voters ?? 0;
-      const vb = tallies[b.id]?.voters ?? 0;
-      if (vb !== va) return vb - va;
-      // Stable-ish fallback: by name
+      const ta = tallies[a.id] ?? { voters: 0, weighted: 0 };
+      const tb = tallies[b.id] ?? { voters: 0, weighted: 0 };
+      if (tb.weighted !== ta.weighted) return tb.weighted - ta.weighted;
+      if (tb.voters !== ta.voters) return tb.voters - ta.voters;
       return a.name.localeCompare(b.name);
     });
   }, [tallies]);
@@ -181,7 +184,7 @@ export default function TonightPage() {
         </p>
       )}
 
-      {/* pass podiumIds for gold/silver/bronze */}
+      {/* gold/silver/bronze by heat */}
       <MapView podiumIds={podiumIds} />
 
       <div className="grid gap-3">
@@ -203,7 +206,6 @@ export default function TonightPage() {
         })}
       </div>
 
-      {/* Floating Vote button for quick access */}
       <a
         href="/vote"
         className="fixed bottom-5 right-5 px-4 py-2 rounded-xl bg-yellow-400 text-black shadow-lg hover:opacity-90"
