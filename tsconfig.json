@@ -17,9 +17,18 @@
       "@/*": ["src/*"]
     },
     "incremental": true,
-    "plugins": [{ "name": "next" }],
-    "types": ["node"]
+    "plugins": [{ "name": "next" }]
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "next-env.d.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "predictions/**",          // ⬅️ exclude Firebase Functions code
+    "functions/**",            // (if you ever have another functions dir)
+    "firebase/**"              // (optional guard for any firebase-admin scripts)
+  ]
 }
