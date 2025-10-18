@@ -1,17 +1,13 @@
-// src/components/VenueCard.tsx
 "use client";
-
-import Link from "next/link";
-import { MouseEvent, useMemo } from "react";
 
 type Props = {
   id: string;
   name: string;
   voters: number;
-  heatScore: number; // 0..100
-  lat: number;       // ⬅️ new
-  lng: number;       // ⬅️ new
-  peakWindow?: string | undefined;
+  heatScore: number;          // 0–100
+  lat: number;
+  lng: number;
+  peakToday?: string | null;  // e.g. "21-22"
 };
 
 export default function VenueCard({
@@ -21,56 +17,45 @@ export default function VenueCard({
   heatScore,
   lat,
   lng,
-  peakWindow,
+  peakToday,
 }: Props) {
-  const mapsUrl = useMemo(() => {
-    const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
-    const isApple = /iPhone|iPad|Macintosh/i.test(ua);
-    return isApple
-      ? `https://maps.apple.com/?daddr=${lat},${lng}&dirflg=w`
-      : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=walking`;
-  }, [lat, lng]);
-
-  function openNav(e: MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    window.open(mapsUrl, "_blank", "noopener,noreferrer");
-  }
-
-  const clamped = Math.max(0, Math.min(100, heatScore));
+  const go = () => {
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+      lat + "," + lng
+    )}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
 
   return (
-    <Link
-      href={`/vote?venue=${encodeURIComponent(id)}`}
-      className="block rounded-2xl border border-neutral-800 hover:border-neutral-700 transition-colors"
-    >
-      <div className="p-4 space-y-2">
-        <div className="flex items-center justify-between gap-3">
-          <div className="font-medium">{name}</div>
-          <button
-            onClick={openNav}
-            className="shrink-0 px-3 py-1.5 rounded-lg border border-neutral-700 text-sm hover:bg-neutral-800"
-            title="Navigate"
-          >
-            Navigate
-          </button>
-        </div>
-
-        {peakWindow && (
-          <div className="text-xs text-neutral-400">~{peakWindow}</div>
-        )}
-
-        <div className="h-2 rounded bg-neutral-800 overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-yellow-400 via-orange-500 to-red-600"
-            style={{ width: `${clamped}%` }}
-          />
-        </div>
-
-        <div className="text-xs text-neutral-400">
-          {voters} {voters === 1 ? "vote" : "votes"}
-        </div>
+    <div className="rounded-xl bg-neutral-900/60 border border-neutral-800 p-4 flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">{name}</h3>
+        <button
+          onClick={go}
+          className="px-3 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-sm"
+        >
+          Navigate
+        </button>
       </div>
-    </Link>
+
+      <div className="w-full h-2 rounded-full bg-neutral-800 overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-lime-400 via-yellow-400 to-red-500"
+          style={{ width: `${Math.max(0, Math.min(100, heatScore))}%` }}
+        />
+      </div>
+
+      <div className="text-sm text-neutral-400">
+        {voters} {voters === 1 ? "vote" : "votes"}
+      </div>
+
+      <div className="text-xs text-neutral-400">
+        {peakToday ? (
+          <>Peak tonight: <span className="text-neutral-200 font-medium">{peakToday}</span></>
+        ) : (
+          <>Peak tonight: <span className="text-neutral-500">—</span></>
+        )}
+      </div>
+    </div>
   );
 }

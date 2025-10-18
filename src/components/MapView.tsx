@@ -1,123 +1,187 @@
+// src/components/MapView.tsx
 "use client";
 
-import { MapContainer, TileLayer, Marker, Tooltip } from "react-leaflet";
+import { useEffect, useRef, useId } from "react";
+import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { VENUES } from "@/lib/venues";
-import { useMemo, useRef } from "react";
-import L, { Icon } from "leaflet";
-import { useRouter } from "next/navigation";
 
-type Props = {
-  // podiumIds[0] = gold, [1] = silver, [2] = bronze
-  podiumIds?: string[];
-};
-
-function makePin(fill: string, stroke: string): Icon {
+// --- Icons (SVG generator) ---------------------------------------------------
+function svgPin(color: string): L.DivIcon {
   const svg = encodeURIComponent(`
-    <svg viewBox="0 0 32 48" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
-          <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-opacity="0.35"/>
-        </filter>
-      </defs>
-      <path filter="url(#shadow)"
-        d="M16 2c-7.18 0-13 5.82-13 13 0 9.75 13 23 13 23s13-13.25 13-23c0-7.18-5.82-13-13-13z"
-        fill="${fill}" stroke="${stroke}" stroke-width="2" />
-      <circle cx="16" cy="15" r="5.4" fill="#ffffff" opacity="0.9"/>
+    <svg width="25" height="41" viewBox="0 0 25 41" xmlns="http://www.w3.org/2000/svg">
+      <defs><filter id="s"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.35"/></filter></defs>
+      <g filter="url(#s)">
+        <path fill="${color}" stroke="#333" stroke-width="1"
+          d="M12.5 1c-6.1 0-11 4.86-11 10.86 0 5.37 8.08 16.2 10.4 19.23.31.41.9.41 1.2 0 2.32-3.03 10.4-13.86 10.4-19.23C23.5 5.86 18.6 1 12.5 1z"/>
+        <circle cx="12.5" cy="12" r="4.5" fill="#fff" stroke="#333" stroke-width="1"/>
+      </g>
     </svg>
   `);
 
-  return L.icon({
-    iconUrl: `data:image/svg+xml;charset=UTF-8,${svg}`,
-    iconSize: [28, 40],
-    iconAnchor: [14, 40],
-    popupAnchor: [0, -36],
-    tooltipAnchor: [0, -30],
-  });
+  return L.divIcon({
+    className: "acc-pin",
+    html: `<img alt="" src="data:image/svg+xml;utf8,${svg}" />`,
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    tooltipAnchor: [12, -30],
+  } as L.DivIconOptions);
 }
 
-const ICONS = {
-  gold: makePin("#f59e0b", "#d97706"),
-  silver: makePin("#9ca3af", "#6b7280"),
-  bronze: makePin("#b45309", "#92400e"),
-  blue: makePin("#3b82f6", "#1d4ed8"),
+const GOLD   = svgPin("#F4C430");
+const SILVER = svgPin("#C0C0C0");
+const BRONZE = svgPin("#CD7F32");
+const BLUE   = svgPin("#3A86FF");
+
+// --- Types -------------------------------------------------------------------
+type RankMap = Record<string, 1 | 2 | 3>;
+
+type Props = {
+  /** venueId -> 1 | 2 | 3 for gold/silver/bronze */
+  ranks?: RankMap;
 };
 
-export default function MapView({ podiumIds = [] }: Props) {
-  const router = useRouter();
-  const lastTapRef = useRef<number>(0);
+// --- Helpers -----------------------------------------------------------------
+function rankLabel(rank?: 1 | 2 | 3) {
+  if (rank === 1) return " — Hottest right now";
+  if (rank === 2) return " — 2nd hottest";
+  if (rank === 3) return " — 3rd hottest";
+  return "";
+}
 
-  const center = useMemo<[number, number]>(() => {
-    const lat =
-      VENUES.reduce((s, v) => s + v.lat, 0) / Math.max(1, VENUES.length);
-    const lng =
-      VENUES.reduce((s, v) => s + v.lng, 0) / Math.max(1, VENUES.length);
-    return [lat, lng];
-  }, []);
+// --- Component ---------------------------------------------------------------
+export default function MapView({ ranks = {} }: Props) {
+  const mapRef = useRef<L.Map | null>(null);
+  const layerGroupRef = useRef<L.LayerGroup | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const containerId = useId();
 
-  const goldId = podiumIds[0] || null;
-  const silverId = podiumIds[1] || null;
-  const bronzeId = podiumIds[2] || null;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
 
-  const iconFor = (venueId: string) => {
-    if (venueId === goldId) return ICONS.gold;
-    if (venueId === silverId) return ICONS.silver;
-    if (venueId === bronzeId) return ICONS.bronze;
-    return ICONS.blue;
-  };
-
-  const suffixFor = (venueId: string) => {
-    if (venueId === goldId) return " — Hottest right now";
-    if (venueId === silverId) return " — 2nd hottest";
-    if (venueId === bronzeId) return " — 3rd hottest";
-    return "";
-  };
-
-  const goVoteFor = (venueId: string) => {
-    router.push(`/vote?venue=${encodeURIComponent(venueId)}`);
-  };
-
-  // Double-tap detector for touch devices (350ms window)
-  const handleTap = (venueId: string) => {
-    const now = Date.now();
-    if (now - lastTapRef.current < 350) {
-      goVoteFor(venueId);
+    // Tear down old map if re-rendered with new props
+    if (mapRef.current) {
+      try {
+        mapRef.current.remove();
+      } catch {}
+      mapRef.current = null;
     }
-    lastTapRef.current = now;
-  };
+    if (containerRef.current) {
+      containerRef.current.innerHTML = "";
+    }
+
+    // Create map
+    const map = L.map(containerRef.current as HTMLDivElement, {
+      center: [53.5699, -2.8823], // Ormskirk approx
+      zoom: 15,
+      zoomControl: true,
+      attributionControl: true,
+    });
+    mapRef.current = map;
+
+    // Tiles
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(map);
+
+    // Marker layer
+    const group = L.layerGroup().addTo(map);
+    layerGroupRef.current = group;
+
+    // Add markers with tooltips + larger tap hitbox
+    VENUES.forEach((v) => {
+      const r = ranks[v.id];
+      const icon = r === 1 ? GOLD : r === 2 ? SILVER : r === 3 ? BRONZE : BLUE;
+
+      const marker = L.marker([v.lat, v.lng], { icon, riseOnHover: true }).addTo(group);
+      marker.bindTooltip(`${v.name}${rankLabel(r)}`, {
+        sticky: true,
+        permanent: false,
+        direction: "top",
+      });
+
+      // Larger tap/click hitbox around the marker for mobile
+      const hitbox = L.circleMarker([v.lat, v.lng], {
+        radius: 18,
+        stroke: false,
+        fillOpacity: 0.01, // capture events but invisible
+        interactive: true,
+      })
+        .on("click", () => marker.fire("click"))
+        .on("tap", () => marker.fire("click"))
+        .addTo(group);
+
+      marker.setZIndexOffset(2000);
+      (hitbox as any).setZIndex?.(1000);
+
+      // Double click / double tap => vote with pre-selected venue
+      marker.on("dblclick", () => {
+        window.location.href = `/vote?venue=${encodeURIComponent(v.id)}`;
+      });
+      let lastTap = 0;
+      marker.on("click", () => {
+        const now = Date.now();
+        if (now - lastTap < 350) {
+          window.location.href = `/vote?venue=${encodeURIComponent(v.id)}`;
+        }
+        lastTap = now;
+      });
+    });
+
+    // Fix sizing after mount
+    const resize = () => {
+      try {
+        map.invalidateSize();
+      } catch {}
+    };
+    map.whenReady(resize);
+    setTimeout(resize, 0);
+    setTimeout(resize, 200);
+
+    // Cleanup
+    return () => {
+      try {
+        if (layerGroupRef.current) {
+          layerGroupRef.current.clearLayers();
+          layerGroupRef.current = null;
+        }
+        if (mapRef.current) {
+          mapRef.current.remove();
+          mapRef.current = null;
+        }
+      } catch {}
+    };
+  }, [ranks]);
 
   return (
-    <div className="rounded-2xl overflow-hidden border border-neutral-800">
-      <MapContainer
-        center={center}
-        zoom={15}
-        scrollWheelZoom={false}
+    <>
+      <div
+        id={containerId}
+        ref={containerRef}
+        className="rounded-xl overflow-hidden border border-neutral-800"
         style={{ height: 420, width: "100%" }}
-      >
-        <TileLayer
-          attribution="&copy; OpenStreetMap contributors"
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-
-        {VENUES.map((v) => (
-          <Marker
-            key={v.id}
-            position={[v.lat, v.lng]}
-            icon={iconFor(v.id)}
-            eventHandlers={{
-              // Desktop double-click
-              dblclick: () => goVoteFor(v.id),
-              // Mobile double-tap (two quick taps)
-              click: () => handleTap(v.id),
-            }}
-          >
-            <Tooltip direction="top" offset={[0, -6]} opacity={1}>
-              {v.name}
-              {suffixFor(v.id)}
-            </Tooltip>
-          </Marker>
-        ))}
-      </MapContainer>
-    </div>
+        aria-label="Live map of Ormskirk venues"
+      />
+      {/* Tiny legend */}
+      <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-neutral-400">
+        <span className="inline-flex items-center gap-1">
+          <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: "#F4C430" }} />
+          Hottest
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: "#C0C0C0" }} />
+          2nd
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: "#CD7F32" }} />
+          3rd
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="inline-block h-3 w-3 rounded-full bg-blue-400" />
+          Other places
+        </span>
+      </div>
+    </>
   );
 }

@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/ensure-summary", "schedule": "0 3 * * *" },
+    { "path": "/api/ensure-summary", "schedule": "0 4 * * *" }
+  ]
+}

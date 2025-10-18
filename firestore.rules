@@ -87,7 +87,6 @@ service cloud.firestore {
 
     // ---------- Votes: nights/{YYYYMMDD}/votes/{userId} ----------
     match /nights/{date}/votes/{userId} {
-
       // Public reads for the Tonight page
       allow read: if true
 
@@ -104,31 +103,18 @@ service cloud.firestore {
       allow write: if false
     }
 
-    // Allow reading the parent night documents (no client writes)
-  match /nights/{date} {
-    allow read: if true;
-    allow write: if false;
-    }
-
-
-    // ---------- Nightly immutable summary: nights/{YYYYMMDD}/summary ----------
-    // Anyone signed in can CREATE it once (if not already there). No updates/deletes.
-    match /nights/{date}/summary {
-      // Publicly readable so the site can show historical stats
-      allow read: if true
-
-      // Exactly-once creation per night
-      allow create: if isSignedIn()
-                    && !exists(/databases/$(database)/documents/nights/$(date)/summary)
-
-      // Immutable after creation
-      allow update, delete: if false
-    }
-
     // Venues catalogue: public read, no client writes
     match /venues/{venueId} {
       allow read: if true
       allow write: if false
+    }
+
+    // ----- Prediction summaries (Admin writes, clients read) -----
+    // Your API route writes these using the Admin SDK (rules are bypassed);
+    // clients just need read access.
+    match /prediction_summaries/{date} {
+      allow read: if true;
+      allow write: if false;
     }
 
     // Optional user profiles

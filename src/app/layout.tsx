@@ -83,7 +83,7 @@ export default function RootLayout({
         {/* Footer (lightweight, optional links duplicated for mobile) */}
         <footer className="border-t border-neutral-900 text-neutral-400 text-xs">
           <div className="max-w-3xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
-            <span>© {new Date().getFullYear()} Acco</span>
+            <span>© {new Date().getFullYear()} Paul In Power</span>
             <div className="flex items-center gap-4">
               <Link href="/privacy" className="hover:text-white sm:hidden">
                 Privacy

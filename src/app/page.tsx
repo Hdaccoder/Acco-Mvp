@@ -1,7 +1,6 @@
 "use client";
 export const dynamic = "force-dynamic";
 
-import EnsureSummary from "@/components/EnsureSummary";
 import NextDynamic from "next/dynamic";
 import { collection, onSnapshot, query } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
@@ -13,9 +12,7 @@ import VenueCard from "@/components/VenueCard";
 import { weight } from "@/lib/heat";
 
 // Map only on client
-const MapView = NextDynamic(() => import("@/components/MapView"), {
-  ssr: false,
-});
+const MapView = NextDynamic(() => import("@/components/MapView"), { ssr: false });
 
 type Vote = {
   intent: "yes" | "maybe" | "no";
@@ -40,13 +37,68 @@ function haversineMeters(
   return 2 * R * Math.asin(Math.sqrt(A));
 }
 
+/**
+ * Choose up to 3 leaders (gold/silver/bronze) with tie-safety.
+ * Ranking key = voters desc, then weighted desc.
+ * If a tie happens at a rank boundary, we STOP assigning further ranks
+ * (so you might get only gold, or gold+silver).
+ */
+function computeTopRanks(tallies: Record<string, { voters: number; weighted: number }>) {
+  const entries = Object.entries(tallies)
+    .filter(([, t]) => t.voters > 0)
+    .sort(([, a], [, b]) => {
+      const byV = b.voters - a.voters;
+      if (byV !== 0) return byV;
+      return b.weighted - a.weighted;
+    });
+
+  const ranks: Record<string, 1 | 2 | 3> = {};
+  let prevKey: string | null = null;
+  let rank = 1 as 1 | 2 | 3;
+  let stoppedForTie = false;
+
+  const keyOf = (t: { voters: number; weighted: number }) =>
+    `${t.voters}|${Math.round(t.weighted * 1000)}`;
+
+  for (const [id, t] of entries) {
+    if (rank > 3) break;
+    const k = keyOf(t);
+
+    if (prevKey !== null && k === prevKey) {
+      stoppedForTie = true;
+      break;
+    }
+
+    ranks[id] = rank;
+    prevKey = k;
+    rank = (rank + 1) as 1 | 2 | 3;
+  }
+
+  const topIds = {
+    gold: Object.keys(ranks).find((id) => ranks[id] === 1) ?? null,
+    silver: Object.keys(ranks).find((id) => ranks[id] === 2) ?? null,
+    bronze: Object.keys(ranks).find((id) => ranks[id] === 3) ?? null,
+  };
+
+  return {
+    ranks,
+    topIds,
+    stoppedForTie,
+    leadersCount: Object.keys(ranks).length,
+  };
+}
+
 export default function TonightPage() {
   const [tallies, setTallies] = useState<
     Record<string, { voters: number; weighted: number }>
   >({});
-  const [sentiment, setSentiment] = useState<{ yesMaybe: number; no: number }>(
-    { yesMaybe: 0, no: 0 }
-  );
+  const [arrivalCounts, setArrivalCounts] = useState<
+    Record<string, Record<string, number>>
+  >({});
+  const [sentiment, setSentiment] = useState<{ yesMaybe: number; no: number }>({
+    yesMaybe: 0,
+    no: 0,
+  });
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -70,6 +122,8 @@ export default function TonightPage() {
           if (!mounted) return;
           const now = Date.now();
           const t: Record<string, { voters: number; weighted: number }> = {};
+          const arrivals: Record<string, Record<string, number>> = {};
+
           let yesMaybe = 0;
           let no = 0;
 
@@ -94,6 +148,13 @@ export default function TonightPage() {
               const venue = VENUE_INDEX[sel.venueId];
               if (!venue) continue;
 
+              // Count arrivals (for "peak tonight")
+              if (sel.arrivalWindow) {
+                arrivals[sel.venueId] ??= {};
+                arrivals[sel.venueId][sel.arrivalWindow] =
+                  (arrivals[sel.venueId][sel.arrivalWindow] ?? 0) + 1;
+              }
+
               const meters = v.location
                 ? haversineMeters(
                     { lat: v.location.lat, lng: v.location.lng },
@@ -114,6 +175,7 @@ export default function TonightPage() {
           });
 
           setTallies(t);
+          setArrivalCounts(arrivals);
           setSentiment({ yesMaybe, no });
           setErr(null);
         },
@@ -129,30 +191,42 @@ export default function TonightPage() {
     };
   }, []);
 
-  // Podium by HEAT (weighted), fallback by voters
-  const podiumIds = useMemo(() => {
-    const entries = Object.entries(tallies)
-      .map(([id, t]) => ({ id, weighted: t.weighted, voters: t.voters }))
-      .filter((x) => x.weighted > 0)
-      .sort((a, b) => {
-        if (b.weighted !== a.weighted) return b.weighted - a.weighted;
-        return b.voters - a.voters;
-      })
-      .slice(0, 3)
-      .map((x) => x.id);
-    return entries;
+  // Heat score (0-100) per venue from tallies
+  const heatScores = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const [id, t] of Object.entries(tallies)) {
+      out[id] = Math.min(100, Math.round((t.weighted ?? 0) * 10));
+    }
+    return out;
   }, [tallies]);
 
-  // Sort cards by HEAT first, then voters, then name
-  const venuesSorted = useMemo(() => {
-    return [...VENUES].sort((a, b) => {
-      const ta = tallies[a.id] ?? { voters: 0, weighted: 0 };
-      const tb = tallies[b.id] ?? { voters: 0, weighted: 0 };
-      if (tb.weighted !== ta.weighted) return tb.weighted - ta.weighted;
-      if (tb.voters !== ta.voters) return tb.voters - ta.voters;
-      return a.name.localeCompare(b.name);
+  // Order venues by heat (desc)
+  const orderedVenues = useMemo(() => {
+    const vs = [...VENUES];
+    vs.sort((a, b) => {
+      const ha = heatScores[a.id] ?? 0;
+      const hb = heatScores[b.id] ?? 0;
+      return hb - ha;
     });
-  }, [tallies]);
+    return vs;
+  }, [heatScores]);
+
+  // Compute top ranks (tie-safe)
+  const { ranks, stoppedForTie, leadersCount } = useMemo(
+    () => computeTopRanks(tallies),
+    [tallies]
+  );
+
+  // Compute "Peak tonight" label from today's arrival windows
+  const todayPeakLabel = (venueId: string): string | null => {
+    const counts = arrivalCounts[venueId];
+    if (!counts) return null;
+    let best: { key: string; n: number } | null = null;
+    for (const [k, n] of Object.entries(counts)) {
+      if (!best || n > best.n) best = { key: k, n };
+    }
+    return best?.key ?? null;
+  };
 
   const totalSentiment = sentiment.yesMaybe + sentiment.no;
   const stayInPct =
@@ -184,14 +258,23 @@ export default function TonightPage() {
         </p>
       )}
 
-      {/* gold/silver/bronze by heat */}
-      <MapView podiumIds={podiumIds} />
+      {/* Map with colored ranks */}
+      <MapView ranks={ranks} />
+
+      {/* Small hint for ties / not enough leaders */}
+      {(stoppedForTie || leadersCount < 3) && (
+        <p className="text-xs text-neutral-500">
+          {stoppedForTie
+            ? "A tie means only clear leaders are highlighted."
+            : "Fewer than three places have votes yet."}
+        </p>
+      )}
 
       <div className="grid gap-3">
-        {venuesSorted.map((v) => {
+        {orderedVenues.map((v) => {
           const t = tallies[v.id] || { voters: 0, weighted: 0 };
-          const score0to100 =
-            t.voters === 0 ? 0 : Math.min(100, Math.round(t.weighted * 10));
+          const score0to100 = heatScores[v.id] ?? 0;
+
           return (
             <VenueCard
               key={v.id}
@@ -201,11 +284,13 @@ export default function TonightPage() {
               heatScore={score0to100}
               lat={v.lat}
               lng={v.lng}
+              peakToday={todayPeakLabel(v.id)}
             />
           );
         })}
       </div>
 
+      {/* Floating Vote button for quick access */}
       <a
         href="/vote"
         className="fixed bottom-5 right-5 px-4 py-2 rounded-xl bg-yellow-400 text-black shadow-lg hover:opacity-90"
