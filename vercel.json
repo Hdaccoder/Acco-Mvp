@@ -1,6 +1,9 @@
 {
   "crons": [
-    { "path": "/api/ensure-summary", "schedule": "0 3 * * *" },
-    { "path": "/api/ensure-summary", "schedule": "0 4 * * *" }
+    {
+      "path": "/api/ensure-summary?key=@CRON_SECRET",
+      "schedule": "0 4 * * *",
+      "timezone": "Europe/London"
+    }
   ]
 }
