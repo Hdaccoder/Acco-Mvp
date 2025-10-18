@@ -11,7 +11,20 @@ import { VENUES } from "@/lib/venues";
 import { nightKey } from "@/lib/dates";
 import { useUserLocation } from "@/hooks/useUserLocation";
 
-const WINDOWS = ["20-21", "21-22", "22-23", "23-24"] as const;
+/**
+ * Expanded arrival windows so people can vote earlier and after midnight.
+ * Feel free to tweak or reorder.
+ */
+const WINDOWS = [
+  "18-19",
+  "19-20",
+  "20-21",
+  "21-22",
+  "22-23",
+  "23-24",
+  "00-01",
+  "01-02",
+] as const;
 
 type Props = { initialVenue: string | null };
 
@@ -20,7 +33,7 @@ export default function VoteClient({ initialVenue }: Props) {
   const [uid, setUid] = useState<string | null>(null);
   const [intent, setIntent] = useState<"yes" | "maybe" | "no">("yes");
   const [selected, setSelected] = useState<string[]>([]);
-  const [windowSel, setWindowSel] = useState<string>(WINDOWS[1]);
+  const [windowSel, setWindowSel] = useState<string>(WINDOWS[2]); // default: 20-21
   const { loc, error: locError } = useUserLocation();
   const [err, setErr] = useState<string | null>(null);
 
@@ -77,7 +90,7 @@ export default function VoteClient({ initialVenue }: Props) {
           },
           { merge: true }
         );
-        router.push("/");              // ⬅️ redirect to home
+        router.push("/");
         return;
       }
 
@@ -104,7 +117,7 @@ export default function VoteClient({ initialVenue }: Props) {
         { merge: true }
       );
 
-      router.push("/");                // ⬅️ redirect to home
+      router.push("/");
     } catch (e: any) {
       setErr(e?.message || String(e));
     }
@@ -127,13 +140,15 @@ export default function VoteClient({ initialVenue }: Props) {
 
       <div className="space-y-2">
         <label className="text-sm text-neutral-300">Are you going out tonight?</label>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {(["yes", "maybe", "no"] as const).map((x) => (
             <button
               key={x}
               onClick={() => setIntent(x)}
               className={`px-3 py-2 rounded-xl border ${
-                intent === x ? "border-yellow-400 bg-yellow-400/10" : "border-neutral-800"
+                intent === x
+                  ? "border-yellow-400 bg-yellow-400/10"
+                  : "border-neutral-800"
               }`}
             >
               {x}
@@ -179,13 +194,15 @@ export default function VoteClient({ initialVenue }: Props) {
 
           <div className="space-y-2">
             <label className="text-sm text-neutral-300">Arrival window</label>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {WINDOWS.map((w) => (
                 <button
                   key={w}
                   onClick={() => setWindowSel(w)}
                   className={`px-3 py-2 rounded-xl border ${
-                    w === windowSel ? "border-yellow-400 bg-yellow-400/10" : "border-neutral-800"
+                    w === windowSel
+                      ? "border-yellow-400 bg-yellow-400/10"
+                      : "border-neutral-800"
                   }`}
                 >
                   {w}
@@ -205,7 +222,9 @@ export default function VoteClient({ initialVenue }: Props) {
       </button>
 
       {locError && (
-        <p className="text-xs text-red-400">Location error: {locError} (You can still vote)</p>
+        <p className="text-xs text-red-400">
+          Location error: {locError} (You can still vote)
+        </p>
       )}
     </div>
   );
