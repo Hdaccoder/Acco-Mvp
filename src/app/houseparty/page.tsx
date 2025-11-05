@@ -1,12 +1,12 @@
 // src/app/houseparty/page.tsx
-export const dynamicMode = 'force-dynamic';  // 👈 renamed to avoid conflict
+export const dynamic = 'force-dynamic'; // ✅ valid Next.js page export
 export const revalidate = 0;
 
-import dynamicImport from 'next/dynamic';     // 👈 alias import
+import nextDynamic from 'next/dynamic';
 
 // Load the interactive client component only on the client
-const HousepartyClient = dynamicImport(() => import('./HousepartyClient'), {
-  ssr: false, // ⬅ prevents "window is not defined" during build/SSR
+const HousepartyClient = nextDynamic(() => import('./HousepartyClient'), {
+  ssr: false, // prevents "window is not defined" during build/SSR
 });
 
 export default function Page() {
