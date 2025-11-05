@@ -2,16 +2,18 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ---------- Helpers ----------
+    // -------------------------------------------------
+    // Helpers
+    // -------------------------------------------------
     function isSignedIn() {
-      return request.auth != null
+      return request.auth != null;
     }
 
     function isSelf(userId) {
-      return isSignedIn() && request.auth.uid == userId
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Allow null, else basic lat/lng/accuracy checks
+    // Allow null, else minimal lat/lng/accuracy checks
     function validLocation(loc) {
       return loc == null ||
         (
@@ -19,112 +21,130 @@ service cloud.firestore {
           loc.lat is number && loc.lat >= -90 && loc.lat <= 90 &&
           loc.lng is number && loc.lng >= -180 && loc.lng <= 180 &&
           (loc.accuracy == null || loc.accuracy is number)
-        )
+        );
     }
 
-    // One selection entry
+    // One selection entry inside a vote
     function validSelection(sel) {
       return sel is map &&
              sel.venueId is string &&
-             (sel.arrivalWindow == null || sel.arrivalWindow is string)
+             (sel.arrivalWindow == null || sel.arrivalWindow is string);
     }
 
     // Non-recursive validator for selections list (supports up to 8)
     function validSelections(arr) {
       return arr is list &&
-             arr.size() <= 8 &&
-             (
-               arr.size() == 0 ||
-               (validSelection(arr[0]) &&
-                 (arr.size() == 1 ||
-                 (validSelection(arr[1]) &&
-                   (arr.size() == 2 ||
-                   (validSelection(arr[2]) &&
-                     (arr.size() == 3 ||
-                     (validSelection(arr[3]) &&
-                       (arr.size() == 4 ||
-                       (validSelection(arr[4]) &&
-                         (arr.size() == 5 ||
-                         (validSelection(arr[5]) &&
-                           (arr.size() == 6 ||
-                           (validSelection(arr[6]) &&
-                             (arr.size() == 7 ||
-                             validSelection(arr[7])
-                             ))
-                           ))
-                         ))
-                       ))
-                     ))
-                   ))
-                 ))
-             )
+        (arr.size() >= 1 && arr.size() <= 8) &&
+        validSelection(arr[0]) &&
+        (
+          arr.size() == 1 ||
+          (validSelection(arr[1]) &&
+            (
+              arr.size() == 2 ||
+              (validSelection(arr[2]) &&
+                (
+                  arr.size() == 3 ||
+                  (validSelection(arr[3]) &&
+                    (
+                      arr.size() == 4 ||
+                      (validSelection(arr[4]) &&
+                        (
+                          arr.size() == 5 ||
+                          (validSelection(arr[5]) &&
+                            (
+                              arr.size() == 6 ||
+                              (validSelection(arr[6]) &&
+                                (
+                                  arr.size() == 7 ||
+                                  (validSelection(arr[7]) && arr.size() == 8)
+                                )
+                              )
+                            )
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        );
     }
 
     // Validate the vote document shape and ownership
     function validVote(doc, userId) {
       return
-        // only allowed fields
-        doc.keys().hasOnly(['userId','intent','selections','location','lastEditedAt']) &&
-
-        // ownership must match both auth uid and path uid
+        // required base fields
+        doc is map &&
         doc.userId is string &&
-        request.auth != null &&
-        doc.userId == request.auth.uid &&
-        doc.userId == userId &&
-
-        // intent
-        (doc.intent in ['yes','maybe','no']) &&
-
-        // selections list (can be empty for "no")
-        validSelections(doc.selections) &&
-
-        // location optional
+        doc.nightKey is string &&
+        doc.createdAt is timestamp &&
+        // owned by caller
+        (isSignedIn() && request.auth.uid == userId && doc.userId == userId) &&
+        // selections
+        (doc.selections is list && validSelections(doc.selections)) &&
+        // optional fields
         validLocation(doc.location) &&
-
-        // timestamp present
-        (doc.lastEditedAt is timestamp)
+        (
+          doc.intent == null || (doc.intent in ['yes','maybe','no'])
+        );
     }
 
-    // ---------- Votes: nights/{YYYYMMDD}/votes/{userId} ----------
+    // -------------------------------------------------
+    // Votes: /nights/{date}/votes/{userId}
+    // -------------------------------------------------
     match /nights/{date}/votes/{userId} {
-      // Public reads for the Tonight page
-      allow read: if true
+      // Public reads for the Tonight page / user own history
+      allow read: if true;
 
-      // Owner can create/update; one doc per user per night (path enforces uniqueness)
-      allow create, update: if isSelf(userId) && validVote(request.resource.data, userId)
+      // Users may write ONLY their own vote docs and only valid shapes
+      allow create, update: if isSelf(userId) &&
+                            validVote(request.resource.data, userId);
 
-      // No client deletes
-      allow delete: if false
+      // No client deletes (keeps history stable)
+      allow delete: if false;
     }
 
-    // Optional: server-written tallies (public read, no client writes)
+    // -------------------------------------------------
+    // Venue tallies (server-written, public read)
+    // /nights/{date}/venueTallies/{venueId}
+    // -------------------------------------------------
     match /nights/{date}/venueTallies/{venueId} {
-      allow read: if true
-      allow write: if false
+      allow read: if true;
+      allow write: if false; // only Admin/cron writes
     }
 
-    // Venues catalogue: public read, no client writes
-    match /venues/{venueId} {
-      allow read: if true
-      allow write: if false
-    }
-
-    // ----- Prediction summaries (Admin writes, clients read) -----
-    // Your API route writes these using the Admin SDK (rules are bypassed);
-    // clients just need read access.
+    // -------------------------------------------------
+    // Prediction summaries (server-only writes)
+    // /prediction_summaries/{date}
+    // -------------------------------------------------
     match /prediction_summaries/{date} {
       allow read: if true;
-      allow write: if false;
+      allow write: if false; // Admin SDK via /api/ensure-summary
     }
 
+    // -------------------------------------------------
+    // NEW: Houseparties (public read, server-only writes)
+    // /houseparties/{partyId}
+    // -------------------------------------------------
+    match /houseparties/{partyId} {
+      allow read: if true;   // show on Tonight/Houseparty pages
+      allow write: if false; // created via /api/houseparty (Admin)
+    }
+
+    // -------------------------------------------------
     // Optional user profiles
+    // -------------------------------------------------
     match /users/{userId} {
-      allow read, write: if isSelf(userId)
+      allow read, write: if isSelf(userId);
     }
 
-    // Everything else denied
+    // -------------------------------------------------
+    // Default deny
+    // -------------------------------------------------
     match /{document=**} {
-      allow read, write: if false
+      allow read, write: if false;
     }
   }
 }

@@ -82,6 +82,15 @@ export default function RootLayout({
               >
                 Vote
               </Link>
+              
+              <Link
+                href="/houseparties"
+                className="hover:text-white"
+              >
+                Houseparties
+              </Link>
+
+              
 
               <Link href="/privacy" className="hover:text-white hidden sm:inline">
                 Privacy

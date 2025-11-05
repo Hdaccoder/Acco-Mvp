@@ -1,5 +1,72 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-html, body, #__next { height: 100%; }
-.leaflet-container { width: 100%; height: 100%; }
+
+/* Keep full-height root */
+html, body, #__next {
+  height: 100%;
+}
+
+/* Leaflet map sizing */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+}
+
+/* Ensure any modal/dialog sits above Leaflet controls/tiles */
+[aria-modal="true"] {
+  z-index: 9999 !important;
+}
+
+/* Dark theme input defaults for better readability on dark backgrounds */
+input, select, textarea {
+  background-color: #0b0b0d;
+  color: #ffffff;
+  border-color: #2a2a2e;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #7a7a85;
+}
+
+/* Improve focus visibility on dark */
+input:focus,
+select:focus,
+textarea:focus,
+button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.75);
+}
+
+/* Glow pulse for houseparty icons */
+.leaflet-marker-icon.drop-shadow-md {
+  animation: glowPulse 2.5s infinite ease-in-out;
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 6px rgba(255, 215, 0, 0.6));
+    transform: scale(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 14px rgba(255, 215, 0, 1));
+    transform: scale(1.08);
+  }
+}
+.acc-house-icon {
+  filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.75));
+}
+
+/* Houseparty pin (DivIcon) – keep the tip fixed on the location */
+.hp-pin {
+  transform-origin: center bottom;           /* critical: no drift */
+  filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.65));
+  /* no scale animation; just glow so we don't move the anchor */
+}
+
+.hp-pin img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
