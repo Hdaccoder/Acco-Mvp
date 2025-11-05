@@ -1,4 +1,7 @@
 // src/app/api/houseparty/list/route.ts
+export const runtime = 'nodejs';       // we use firebase-admin
+export const dynamic = 'force-dynamic';// this route depends on query/time
+export const revalidate = 0;           // no caching; always fresh
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { nightKey } from '@/lib/dates';
