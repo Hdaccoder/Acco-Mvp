@@ -22,8 +22,10 @@ export const VENUES: Venue[] = [
 { id: "number-12-bar", name: "Number Twelve Bar", lat: 53.56778, lng: -2.88641 },
 { id: "murphys-irish-bar", name: "Murphy's Irish Bar", lat: 53.56692, lng: -2.88621 },
 { id: "queens-head", name: "Queens Head", lat: 53.56695, lng: -2.88448 },
-{ id: "nordic-lounge", name: "Nordic Lounge", lat: 53.56700, lng: -2.88485 },
+{ id: "nordico-lounge", name: "Nordico Lounge", lat: 53.56700, lng: -2.88485 },
 { id: "the-green-room", name: "The Green Room", lat: 53.56710, lng: -2.88416 },
 { id: "the-golden-lion", name: "The Golden Lion", lat: 53.56706, lng: -2.88391 },
-{ id: "tap-room", name: "Tap Room",lat: 53.56776, lng: -2.88566 }
+{ id: "tap-room", name: "Tap Room",lat: 53.56776, lng: -2.88566 },
+{ id: "liquid-bar", name: "Liquid Bar",lat: 53.566720, lng: -2.883420 },
+{ id: "tiny-tavern", name: "Tiny Tavern",lat: 53.56787, lng: -2.88574 }
 ];
