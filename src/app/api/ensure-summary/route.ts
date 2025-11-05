@@ -1,161 +1,195 @@
 // src/app/api/ensure-summary/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase-admin";
-import { VENUES } from "@/lib/venues";
+import { adminDb, getAdminApp } from "@/lib/firebase-admin";
+import { Timestamp } from "firebase-admin/firestore";
 
-/**
- * Runtime must be Node.js so we can use Admin SDK.
- */
-export const runtime = "nodejs";
+type Vote = {
+  intent: "yes" | "maybe" | "no";
+  selections?: { venueId: string; arrivalWindow?: string }[];
+  lastEditedAt?: Timestamp;
+};
 
-/** Helpers to read env in prod and dev */
-const CRON_SECRET =
-  (process.env.CRON_SECRET || "").trim() ||
-  (process.env.VERCEL_CRON_SECRET || "").trim(); // optional fallback if you used a different name
-
-/** Parse YYYYMMDD as number -> Date (local). */
-function parseNight(key: string): Date | null {
-  if (!/^\d{8}$/.test(key)) return null;
-  const y = +key.slice(0, 4);
-  const m = +key.slice(4, 6) - 1;
-  const d = +key.slice(6, 8);
-  const dt = new Date(y, m, d);
-  return Number.isNaN(dt.getTime()) ? null : dt;
+function nightKey(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}${m}${d}`;
 }
 
-/** Format date -> YYYYMMDD using local (UK) time. */
-function formatNight(d: Date): string {
-  const y = d.getFullYear();
-  const m = `${d.getMonth() + 1}`.padStart(2, "0");
-  const day = `${d.getDate()}`.padStart(2, "0");
-  return `${y}${m}${day}`;
+function addDays(d: Date, delta: number) {
+  const copy = new Date(d);
+  copy.setDate(copy.getDate() + delta);
+  return copy;
+}
+function weekdayIndex(d: Date) {
+  // 0=Sun ... 6=Sat
+  return d.getDay();
 }
 
-/** Return last N night keys strictly BEFORE `endKey` (exclusive). */
-function lastNNightsBefore(endKey: string, n: number): string[] {
-  const end = parseNight(endKey) || new Date();
-  const out: string[] = [];
-  for (let i = 1; i <= n; i++) {
-    const d = new Date(end);
-    d.setDate(d.getDate() - i);
-    out.push(formatNight(d));
-  }
-  return out;
-}
-
-/** Tiny normaliser: weighted votes -> 0..100 (cap). */
-function toScore0to100(weight: number) {
-  return Math.max(0, Math.min(100, Math.round(weight * 10)));
-}
-
-/** Check auth via query ?key=..., header x-cron-key: ... OR Authorization: Bearer ... */
-function isAuthorised(req: NextRequest): boolean {
-  const qKey = (req.nextUrl.searchParams.get("key") || "").trim();
-  const hKey = (req.headers.get("x-cron-key") || "").trim();
-  const bearer = (req.headers.get("authorization") || "").trim();
-  const bKey = bearer.toLowerCase().startsWith("bearer ")
-    ? bearer.slice(7).trim()
-    : "";
-  if (!CRON_SECRET) return false;
-  return [qKey, hKey, bKey].includes(CRON_SECRET);
-}
+const CRON_SECRET = process.env.CRON_SECRET || "";
 
 export async function GET(req: NextRequest) {
-  // 1) Auth
-  if (!isAuthorised(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    // --------- security -----------
+    const url = new URL(req.url);
+    const key = url.searchParams.get("key");
+    if (!CRON_SECRET || key !== CRON_SECRET) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Optional query:
+    //   for=YYYYMMDD  (generate prediction for a specific night)
+    //   backfill=N    (generate last N nights)
+    //   dryRun=1      (don’t write)
+    const forParam = url.searchParams.get("for");
+    const backfill = Number(url.searchParams.get("backfill") || 0);
+    const dryRun = url.searchParams.get("dryRun") === "1";
+
+    if (backfill > 0) {
+      const today = new Date();
+      const outputs: string[] = [];
+      for (let i = backfill; i >= 1; i--) {
+        const date = addDays(today, -i);
+        const nk = nightKey(date);
+        const res = await generatePrediction(nk);
+        outputs.push(`${nk}:${res.top?.[0] ?? "none"}`);
+        if (!dryRun) await writePrediction(nk, res);
+      }
+      return NextResponse.json({ ok: true, backfilled: outputs, dryRun });
+    }
+
+    const targetKey = forParam || nightKey(addDays(new Date(), 0)); // default = today/tonight
+    const out = await generatePrediction(targetKey);
+
+    if (!dryRun) await writePrediction(targetKey, out);
+
+    return NextResponse.json({ ok: true, targetKey, dryRun, out });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message ?? "Internal error" }, { status: 500 });
+  }
+}
+
+/** Reads past nights and generates a per-venue prediction (0–100) + typical peak. */
+async function generatePrediction(targetNightKey: string) {
+  const db = adminDb();
+  const app = getAdminApp(); // keep admin app warm
+
+  // ---- parameters you can tweak ----
+  const USE_WEEKS = 8;                // how many weeks back (same weekday)
+  const RECENT_DAYS = 14;             // trend lookback window
+  const ALPHA_SAME_WEEKDAY = 0.6;     // blend weight for same-weekday baseline
+  const ALPHA_RECENT_TREND = 0.4;     // blend weight for recent days trend
+
+  // derive target date
+  const y = Number(targetNightKey.slice(0, 4));
+  const m = Number(targetNightKey.slice(4, 6)) - 1;
+  const d = Number(targetNightKey.slice(6, 8));
+  const targetDate = new Date(y, m, d);
+  const targetWday = weekdayIndex(targetDate);
+
+  // ------------ gather past nights ------------
+  // 1) Same weekday across the last N weeks
+  const sameWeekdayKeys: string[] = [];
+  for (let w = 1; w <= USE_WEEKS; w++) {
+    const date = addDays(targetDate, -7 * w);
+    sameWeekdayKeys.push(nightKey(date));
   }
 
-  // 2) Params
-  const dryRun = req.nextUrl.searchParams.get("dryRun") === "1";
-  // allow building for a specific "today" (useful for backfill)
-  const todayKeyOverride = req.nextUrl.searchParams.get("date"); // YYYYMMDD
-  const nowUK = new Date(); // local process time (your server is UTC, but for our summary that's fine)
-  const todayKey = todayKeyOverride && /^\d{8}$/.test(todayKeyOverride)
-    ? todayKeyOverride
-    : formatNight(nowUK);
+  // 2) Recent trend (last RECENT_DAYS)
+  const recentKeys: string[] = [];
+  for (let i = 1; i <= RECENT_DAYS; i++) {
+    const date = addDays(targetDate, -i);
+    recentKeys.push(nightKey(date));
+  }
 
-  // 3) Collect recent nights (e.g., 7 nights ending before today)
-  const recentNightKeys = lastNNightsBefore(todayKey, 7);
+  // helper to tally (voters and arrival windows)
+  const venueCountSame: Record<string, number> = {};
+  const venueCountRecent: Record<string, number> = {};
+  const arrivalCount: Record<string, Record<string, number>> = {};
 
-  // 4) Aggregate from votes
-  const db = adminDb();
-  const tallies: Record<string, { voters: number; weighted: number }> = {};
-  const arrivals: Record<string, Record<string, number>> = {};
+  // Count function used for both sets
+  async function tallyNight(nk: string, bucket: Record<string, number>) {
+    const snap = await db.collection("nights").doc(nk).collection("votes").get();
+    snap.forEach((d) => {
+      const v = d.data() as Vote;
+      if (!v || v.intent === "no" || !Array.isArray(v.selections)) return;
 
-  for (const nk of recentNightKeys) {
-    const votesSnap = await db.collection("nights").doc(nk).collection("votes").get();
+      for (const s of v.selections) {
+        const vid = s.venueId;
+        if (!vid) continue;
 
-    votesSnap.forEach((doc) => {
-      const v: any = doc.data();
-      if (!v || v.intent === "no") return;
+        bucket[vid] = (bucket[vid] ?? 0) + 1;
 
-      // simple weighting: yes=1, maybe=0.6; you can refine if you prefer
-      const w = v.intent === "maybe" ? 0.6 : 1;
-
-      for (const sel of v.selections || []) {
-        const venueId: string = sel.venueId;
-        if (!venueId) continue;
-
-        tallies[venueId] ??= { voters: 0, weighted: 0 };
-        tallies[venueId].voters += 1;
-        tallies[venueId].weighted += w;
-
-        if (sel.arrivalWindow) {
-          arrivals[venueId] ??= {};
-          arrivals[venueId][sel.arrivalWindow] =
-            (arrivals[venueId][sel.arrivalWindow] ?? 0) + 1;
+        if (s.arrivalWindow) {
+          arrivalCount[vid] ??= {};
+          arrivalCount[vid][s.arrivalWindow] =
+            (arrivalCount[vid][s.arrivalWindow] ?? 0) + 1;
         }
       }
     });
   }
 
-  // 5) Convert to items for UI
-  const venueIndex = new Map(VENUES.map((v) => [v.id, v]));
-  const items = VENUES.map((v) => {
-    const t = tallies[v.id] || { voters: 0, weighted: 0 };
-    // pick "typical" peak = most frequent arrival window from the sample
-    let peakLabel: string | null = null;
-    if (arrivals[v.id]) {
-      let bestKey: string | null = null;
-      let bestN = -1;
-      for (const [k, n] of Object.entries(arrivals[v.id])) {
-        if (n > bestN) {
-          bestN = n;
-          bestKey = k;
-        }
-      }
-      peakLabel = bestKey;
-    }
+  // Run tallies
+  await Promise.all(sameWeekdayKeys.map((nk) => tallyNight(nk, venueCountSame)));
+  await Promise.all(recentKeys.map((nk) => tallyNight(nk, venueCountRecent)));
 
-    return {
-      id: v.id,
-      name: v.name,
-      voters: t.voters,
-      score: toScore0to100(t.weighted),
-      peakLabel,
-      lat: v.lat,
-      lng: v.lng,
-    };
-  })
-    // sort by score desc (tie-break by voters)
-    .sort((a, b) => (b.score - a.score) || (b.voters - a.voters));
+  // Normalise vectors to 0..1 so blends are comparable
+  function normalise(map: Record<string, number>) {
+    const max = Math.max(1, ...Object.values(map));
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(map)) out[k] = v / max;
+    return out;
+  }
+  const normSame = normalise(venueCountSame);
+  const normRecent = normalise(venueCountRecent);
 
-  // 6) Write summary doc unless dryRun
-  if (!dryRun) {
-    await db.collection("prediction_summaries").doc(todayKey).set({
-      createdAt: new Date(),
-      sourceNights: recentNightKeys,
-      items,
-    }, { merge: true });
+  // Blend to form a raw score, then scale to 0..100
+  const blended: Record<string, number> = {};
+  const allVenueIds = new Set([
+    ...Object.keys(normSame),
+    ...Object.keys(normRecent),
+  ]);
+  for (const id of allVenueIds) {
+    const s = normSame[id] ?? 0;
+    const r = normRecent[id] ?? 0;
+    blended[id] = ALPHA_SAME_WEEKDAY * s + ALPHA_RECENT_TREND * r;
+  }
+  const maxBlend = Math.max(0.001, ...Object.values(blended));
+  const score0to100: Record<string, number> = {};
+  for (const [id, v] of Object.entries(blended)) {
+    score0to100[id] = Math.round((v / maxBlend) * 100);
   }
 
-  return NextResponse.json({
-    ok: true,
-    date: todayKey,
-    nightsUsed: recentNightKeys.length,
-    dryRun,
-    items,
-  });
+  // Typical peak from arrivalCount map
+  const typicalPeak: Record<string, string | null> = {};
+  for (const [vid, counts] of Object.entries(arrivalCount)) {
+    let best: { k: string; n: number } | null = null;
+    for (const [k, n] of Object.entries(counts)) {
+      if (!best || n > best.n) best = { k, n };
+    }
+    typicalPeak[vid] = best?.k ?? null;
+  }
+
+  // Rank
+  const top = Object.entries(score0to100)
+    .sort((a, b) => b[1] - a[1])
+    .map(([id]) => id)
+    .slice(0, 10);
+
+  return {
+    generatedAt: Timestamp.now(),
+    targetNightKey,
+    items: Object.fromEntries(
+      Object.entries(score0to100).map(([id, score]) => [
+        id,
+        { score, typicalPeak: typicalPeak[id] ?? null },
+      ])
+    ),
+    top,
+  };
 }
 
+async function writePrediction(nk: string, payload: any) {
+  const db = adminDb();
+  await db.collection("prediction_summaries").doc(nk).set(payload, { merge: true });
+}
