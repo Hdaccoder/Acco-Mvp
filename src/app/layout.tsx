@@ -2,7 +2,8 @@
 import "./globals.css";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { Analytics } from "@vercel/analytics/react"; 
+import { Analytics } from "@vercel/analytics/react";
+import Script from "next/script";
 
 export const metadata: Metadata = {
   title: "Acco — Tonight in Ormskirk",
@@ -20,6 +21,12 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // ---- AdSense config via envs ----
+  const ADS_PUB =
+    process.env.NEXT_PUBLIC_ADSENSE_PUB ?? "ca-pub-0000000000000000"; // fallback
+  const LEFT_SLOT = process.env.NEXT_PUBLIC_ADSENSE_LEFT_SLOT ?? "";
+  const RIGHT_SLOT = process.env.NEXT_PUBLIC_ADSENSE_RIGHT_SLOT ?? "";
+
   // Pre-baked "mailto" with a short issue template
   const issuesHref =
     "mailto:paul.is.in.power@gmail.com" +
@@ -43,6 +50,19 @@ export default function RootLayout({
 
   return (
     <html lang="en">
+      <head>
+        {/* --- Google AdSense loader (site-wide) --- */}
+        {ADS_PUB && (
+          <Script
+            id="adsbygoogle-loader"
+            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADS_PUB}`}
+            strategy="afterInteractive"
+            async
+            crossOrigin="anonymous"
+          />
+        )}
+      </head>
+
       <body className="min-h-screen bg-neutral-950 text-white">
         {/* Top nav */}
         <header className="sticky top-0 z-20 backdrop-blur bg-neutral-950/70 border-b border-neutral-900">
@@ -77,10 +97,47 @@ export default function RootLayout({
           </div>
         </header>
 
-        {/* Page content */}
+        {/* --- Side rails (hidden on <xl). 
+             We keep them OUTSIDE the max-width container so they sit at the edges. --- */}
+        {ADS_PUB && (
+          <>
+            {/* Left rail */}
+            <aside className="hidden xl:block fixed top-24 left-4 z-10">
+              <ins
+                className="adsbygoogle"
+                style={{ display: "block", width: 160, height: 600 }}
+                data-ad-client={ADS_PUB}
+                data-ad-slot={LEFT_SLOT}
+                data-ad-format="vertical"
+                data-full-width-responsive="false"
+              />
+              {/* AdSense needs a push() after the ins appears */}
+              <Script id="ads-left-push" strategy="afterInteractive">
+                {`(window.adsbygoogle = window.adsbygoogle || []).push({});`}
+              </Script>
+            </aside>
+
+            {/* Right rail */}
+            <aside className="hidden xl:block fixed top-24 right-4 z-10">
+              <ins
+                className="adsbygoogle"
+                style={{ display: "block", width: 160, height: 600 }}
+                data-ad-client={ADS_PUB}
+                data-ad-slot={RIGHT_SLOT}
+                data-ad-format="vertical"
+                data-full-width-responsive="false"
+              />
+              <Script id="ads-right-push" strategy="afterInteractive">
+                {`(window.adsbygoogle = window.adsbygoogle || []).push({});`}
+              </Script>
+            </aside>
+          </>
+        )}
+
+        {/* Page content (kept at 3xl so side rails have space on xl screens) */}
         <main className="max-w-3xl mx-auto px-4 py-5">{children}</main>
 
-        {/* Footer (lightweight, optional links duplicated for mobile) */}
+        {/* Footer */}
         <footer className="border-t border-neutral-900 text-neutral-400 text-xs">
           <div className="max-w-3xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
             <span>© {new Date().getFullYear()} Paul In Power</span>
@@ -97,6 +154,9 @@ export default function RootLayout({
             </div>
           </div>
         </footer>
+
+        {/* Vercel analytics (unchanged) */}
+        <Analytics />
       </body>
     </html>
   );
