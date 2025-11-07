@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import ReportButton from '@/components/ReportButton';
 
 type HP = {
   id: string;
@@ -37,7 +38,6 @@ export default function HousepartiesPage() {
         const res = await fetch(endpoint, { cache: 'no-store' });
         const ct = res.headers.get('content-type') || '';
         if (!res.ok) {
-          // Prefer JSON error if available, otherwise friendly text
           if (ct.includes('application/json')) {
             const j = await res.json();
             throw new Error(j?.error || 'Failed to load houseparties.');
@@ -103,13 +103,11 @@ export default function HousepartiesPage() {
             Loading…
           </div>
         )}
-
         {err && (
           <div className="rounded-xl border border-red-500/30 bg-red-950/40 p-4 text-sm text-red-200">
             {err}
           </div>
         )}
-
         {!loading && !err && items.length === 0 && (
           <div className="rounded-xl border border-white/10 bg-gray-900 p-6 text-sm text-gray-300">
             {range === 'tonight'
@@ -119,29 +117,44 @@ export default function HousepartiesPage() {
         )}
 
         {items.map((hp) => (
-          <article key={hp.id} className="rounded-xl border border-white/10 bg-gray-900 p-4">
+          <article
+            key={hp.id}
+            className="rounded-xl border border-white/10 bg-gray-900 p-4"
+          >
             <div className="flex items-start justify-between gap-3">
+              {/* left content */}
               <div>
-                <h2 className="text-lg font-medium text-white">{hp.name || 'Houseparty'}</h2>
+                <h2 className="text-lg font-medium text-white">
+                  {hp.name || 'Houseparty'}
+                </h2>
                 <p className="mt-1 text-sm text-gray-400">
                   {formatKind(hp.kind)}
                   {hp.startsAt || hp.endsAt ? <> · {formatWindow(hp.startsAt, hp.endsAt)}</> : null}
                 </p>
-                {hp.address && <p className="mt-1 text-sm text-gray-300">{hp.address}</p>}
-                {hp.notes && <p className="mt-2 text-sm text-gray-400">{hp.notes}</p>}
+                {hp.address && (
+                  <p className="mt-1 text-sm text-gray-300">{hp.address}</p>
+                )}
+                {hp.notes && (
+                  <p className="mt-2 text-sm text-gray-400">{hp.notes}</p>
+                )}
               </div>
 
-              {hp.location && (
-                <a
-                  href={`https://www.google.com/maps?q=${hp.location.lat},${hp.location.lng}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center rounded-md border border-white/20 px-3 py-2 text-xs text-white hover:border-white/40"
-                >
-                  Navigate
-                </a>
-              )}
+              {/* right actions */}
+              <div className="flex items-center gap-2">
+                {hp.location && (
+                  <a
+                    href={`https://www.google.com/maps?q=${hp.location.lat},${hp.location.lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center rounded-md border border-white/20 px-3 py-2 text-xs text-white hover:border-white/40"
+                  >
+                    Navigate
+                  </a>
+                )}
+                <ReportButton id={hp.id} />
+              </div>
             </div>
+
             <p className="mt-3 text-xs text-gray-500">Night: {hp.nightKey}</p>
           </article>
         ))}

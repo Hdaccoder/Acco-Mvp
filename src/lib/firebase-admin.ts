@@ -1,34 +1,49 @@
 // src/lib/firebase-admin.ts
-import { App, cert, getApps, initializeApp } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getApps, initializeApp, cert, type App } from 'firebase-admin/app';
+import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { getAuth, type Auth } from 'firebase-admin/auth';
 
-/**
- * Lazily initialize a single Admin app instance.
- */
 let _app: App | null = null;
+let _db: Firestore | null = null;
+let _auth: Auth | null = null;
 
-export function getAdminApp(): App {
+const getAdminApp = (): App => {
   if (_app) return _app;
 
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKeyRaw = process.env.FIREBASE_PRIVATE_KEY;
+
+  if (!projectId || !clientEmail || !privateKeyRaw) {
+    throw new Error(
+      'Missing Firebase Admin env vars (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY).'
+    );
+  }
+
+  const privateKey = privateKeyRaw.replace(/\\n/g, '\n');
+
   _app =
-    getApps()[0] ??
-    initializeApp({
-      credential: cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        // NOTE: many providers escape newlines in env vars
-        privateKey: (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n"),
-      }),
-    });
+    getApps().length > 0
+      ? getApps()[0]!
+      : initializeApp({
+          credential: cert({
+            projectId,
+            clientEmail,
+            privateKey,
+          }),
+        });
 
   return _app;
-}
+};
 
-/**
- * Admin Firestore instance (modular API).
- */
-export function adminDb() {
-  return getFirestore(getAdminApp());
-}
+export const adminDb = (): Firestore => {
+  if (_db) return _db;
+  _db = getFirestore(getAdminApp());
+  return _db!;
+};
 
-export type AdminDB = ReturnType<typeof adminDb>;
+export const adminAuth = (): Auth => {
+  if (_auth) return _auth;
+  _auth = getAuth(getAdminApp());
+  return _auth!;
+};

@@ -1,209 +1,216 @@
+// src/app/houseparty/HousepartyClient.tsx
 'use client';
 
-import { useState } from 'react';
-import { saveHouseparty } from '@/lib/housepartyStore';
-import { nightKey } from '@/lib/dates';
-import dynamic from 'next/dynamic';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import MapPicker from '@/components/MapPicker';
+import { auth } from '@/lib/firebase';
 
-// Lazy load map picker (client-only)
-const MapPicker = dynamic(() => import('@/components/MapPicker'), {
-  ssr: false,
-});
-
-type LatLng = { lat: number; lng: number };
+type Kind = 'pres' | 'afters' | 'all-night';
 
 export default function HousepartyClient() {
-  const [kind, setKind] = useState<'pres' | 'afters' | 'all-night'>('all-night');
-  const [startsAt, setStartsAt] = useState('');
-  const [endsAt, setEndsAt] = useState('');
+  const [kind, setKind] = useState<Kind>('all-night');
+  const [startsAt, setStartsAt] = useState<string>('');
+  const [endsAt, setEndsAt] = useState<string>('');
+  const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
-  const [name, setName] = useState('');
-  const [location, setLocation] = useState<LatLng | null>(null);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [agree, setAgree] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
 
-  const [submitting, setSubmitting] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
+  useEffect(() => {
+    const now = new Date();
+    const start = new Date();
+    start.setHours(Math.max(20, now.getHours()), 0, 0, 0);
+    const end = new Date(start);
+    end.setHours(start.getHours() + 4);
+    setStartsAt(start.toISOString().slice(0, 16));
+    setEndsAt(end.toISOString().slice(0, 16));
+  }, []);
 
-  const night = nightKey(new Date());
-
-  function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!location) {
-      alert('Please drop a pin on the map to set your houseparty location.');
-      return;
+  async function getIdTokenSafe(): Promise<string> {
+    try {
+      // Optional chain through currentUser; returns '' if not signed in
+      const token = await auth?.currentUser?.getIdToken();
+      return token ?? '';
+    } catch {
+      return '';
     }
-    setShowConfirm(true);
   }
 
-  async function confirmPublish() {
-    if (!location) return; // type guard
+  async function onPublish() {
+    setMsg(null);
+    if (!agree) return setMsg('Please confirm this is a real event.');
+    if (!coords) return setMsg('Pick a location.');
+    if (!startsAt || !endsAt) return setMsg('Choose start and end times.');
 
     try {
-      setSubmitting(true);
-      await saveHouseparty({
-        name: name.trim() || 'Unnamed party',
-        kind,
-        address: address.trim(),
-        notes: notes.trim(),
-        nightKey: night,
-        location, // non-null because of the guard above
-        startsAt: startsAt || null,
-        endsAt: endsAt || null,
+      setSaving(true);
+      const token = await getIdTokenSafe();
+
+      const res = await fetch('/api/houseparty/create', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          name,
+          kind,
+          address,
+          notes,
+          location: coords,
+          startsAt: new Date(startsAt).toISOString(),
+          endsAt: new Date(endsAt).toISOString(),
+        }),
       });
-      alert('✅ Houseparty added for tonight!');
-      window.location.href = '/houseparties';
-    } catch (err) {
-      console.error('Error publishing houseparty:', err);
-      alert('Something went wrong while publishing.');
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Failed to publish');
+
+      setMsg(
+        data?.status === 'pending'
+          ? 'Thanks! Your party was submitted and is pending review.'
+          : 'Published! It will appear on the map shortly.'
+      );
+
+      setName('');
+      setNotes('');
+    } catch (e: any) {
+      setMsg(e?.message || 'Failed to publish');
     } finally {
-      setSubmitting(false);
-      setShowConfirm(false);
+      setSaving(false);
     }
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8 text-white">
-      <h1 className="text-3xl font-semibold mb-2">
-        Add a Houseparty <span className="text-yellow-400">(Tonight)</span>
-      </h1>
-      <p className="text-neutral-400 mb-8">
-        Share your pre’s, afters, or all-night party for tonight so people can find it.
+    <main className="container mx-auto max-w-3xl px-4 py-6 md:py-10">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-3xl font-semibold tracking-tight text-white">
+          Add a Houseparty (Tonight)
+        </h1>
+        <Link
+          href="/houseparties"
+          className="inline-flex items-center rounded-md border border-white/20 px-3 py-2 text-sm text-white hover:border-white/40"
+        >
+          View all
+        </Link>
+      </div>
+
+      <p className="mt-3 text-sm text-neutral-300">
+        Real events only. Spam or fake events are removed and may restrict your account.
       </p>
 
-      <form onSubmit={onSubmit} className="space-y-6">
-        {/* Type */}
-        <div>
-          <label className="block text-sm font-medium mb-2">Type</label>
-          <div className="flex gap-3">
-            {(['pres', 'afters', 'all-night'] as const).map((k) => (
-              <button
-                key={k}
-                type="button"
-                onClick={() => setKind(k)}
-                className={`px-4 py-2 rounded-full border transition ${
-                  kind === k
-                    ? 'bg-yellow-400 text-black'
-                    : 'border-neutral-700 text-neutral-300 hover:border-yellow-400'
-                }`}
-              >
-                {k === 'pres' ? "Pre's" : k === 'afters' ? 'Afters' : 'All Night'}
-              </button>
-            ))}
-          </div>
+      {/* Type */}
+      <div className="mt-6">
+        <label className="block mb-2 text-sm text-neutral-300">Type</label>
+        <div className="flex gap-2">
+          {([
+            { k: 'pres', label: "Pre's" },
+            { k: 'afters', label: 'Afters' },
+            { k: 'all-night', label: 'All night' },
+          ] as const).map((opt) => (
+            <button
+              key={opt.k}
+              onClick={() => setKind(opt.k)}
+              className={`rounded-full px-3 py-1 text-sm ${
+                kind === opt.k
+                  ? 'bg-white text-black'
+                  : 'border border-white/20 text-white hover:border-white/40'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
+      </div>
 
-        {/* Name */}
+      {/* Times */}
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium mb-2">Name</label>
+          <label className="block mb-2 text-sm text-neutral-300">Starts</label>
           <input
-            type="text"
-            placeholder="e.g., DJ Mike’s Bash"
+            type="datetime-local"
+            value={startsAt}
+            onChange={(e) => setStartsAt(e.target.value)}
+            className="w-full rounded-md border border-white/10 bg-neutral-900 px-3 py-2 text-white outline-none"
+          />
+        </div>
+        <div>
+          <label className="block mb-2 text-sm text-neutral-300">Ends</label>
+          <input
+            type="datetime-local"
+            value={endsAt}
+            onChange={(e) => setEndsAt(e.target.value)}
+            className="w-full rounded-md border border-white/10 bg-neutral-900 px-3 py-2 text-white outline-none"
+          />
+        </div>
+      </div>
+
+      {/* Text fields */}
+      <div className="mt-6 grid grid-cols-1 gap-4">
+        <div>
+          <label className="block mb-2 text-sm text-neutral-300">Name (optional)</label>
+          <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full p-3 bg-neutral-900 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-yellow-400"
+            placeholder="e.g., Dj Mike’s"
+            className="w-full rounded-md border border-white/10 bg-neutral-900 px-3 py-2 text-white outline-none"
           />
         </div>
-
-        {/* Times */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">Starts</label>
-            <input
-              type="datetime-local"
-              value={startsAt}
-              onChange={(e) => setStartsAt(e.target.value)}
-              className="w-full p-3 bg-neutral-900 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-yellow-400"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">Ends</label>
-            <input
-              type="datetime-local"
-              value={endsAt}
-              onChange={(e) => setEndsAt(e.target.value)}
-              className="w-full p-3 bg-neutral-900 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-yellow-400"
-            />
-          </div>
-        </div>
-
-        {/* Address */}
         <div>
-          <label className="block text-sm font-medium mb-2">Address / Building</label>
+          <label className="block mb-2 text-sm text-neutral-300">Address / Building</label>
           <input
-            type="text"
-            placeholder="e.g., 12 Park Rd, Flat 3A, L39 ..."
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            className="w-full p-3 bg-neutral-900 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-yellow-400"
+            placeholder="e.g., 12 Park Rd, Flat 3A"
+            className="w-full rounded-md border border-white/10 bg-neutral-900 px-3 py-2 text-white outline-none"
           />
         </div>
-
-        {/* Notes */}
         <div>
-          <label className="block text-sm font-medium mb-2">Notes (optional)</label>
+          <label className="block mb-2 text-sm text-neutral-300">Notes (optional)</label>
           <textarea
-            placeholder="Anything guests should know? e.g., ‘Text on arrival’, ‘Bring your own drinks’, ‘Quiet after midnight’..."
-            maxLength={500}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="w-full p-3 h-28 bg-neutral-900 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-yellow-400"
+            placeholder="Anything guests should know?"
+            rows={4}
+            className="w-full rounded-md border border-white/10 bg-neutral-900 px-3 py-2 text-white outline-none"
           />
-          <p className="text-sm text-neutral-500 mt-1">Up to 500 characters.</p>
         </div>
+      </div>
 
-        {/* Map */}
-        <div>
-          <label className="block text-sm font-medium mb-2">Location</label>
-          {/* MapPicker.value expects a non-null LatLng in your codebase; pass undefined when empty */}
-          <MapPicker value={location ?? undefined} onChange={setLocation} />
+      {/* Location */}
+      <section className="mt-6">
+        <label className="block mb-2 text-sm text-neutral-300">Location</label>
+        <div className="rounded-xl overflow-hidden border border-white/10">
+          <MapPicker value={coords} onChange={setCoords} height={320} />
         </div>
+        {coords && (
+          <p className="mt-2 text-xs text-neutral-400">
+            {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
+          </p>
+        )}
+      </section>
 
-        {/* Publish */}
-        <div className="pt-4">
-          <button
-            type="submit"
-            disabled={submitting}
-            className="bg-yellow-400 text-black font-medium rounded-lg px-6 py-3 hover:bg-yellow-300 disabled:opacity-60"
-          >
-            {submitting ? 'Publishing...' : 'Publish for Tonight'}
-          </button>
-        </div>
-      </form>
+      {/* Affirmation */}
+      <label className="mt-6 flex items-center gap-2 text-sm text-neutral-300">
+        <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+        I confirm this is a real event. I understand fake posts will be removed.
+      </label>
 
-      {/* Simple confirm dialog (no framer-motion) */}
-      {showConfirm && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999]">
-          <div className="bg-neutral-950 p-6 rounded-xl shadow-xl w-[90%] max-w-md border border-neutral-800">
-            <h2 className="text-lg font-semibold mb-3">Confirm publish?</h2>
-            <p className="text-neutral-300 text-sm mb-4">
-              Once you publish a houseparty,{' '}
-              <span className="font-semibold text-yellow-400">you cannot take it down</span> for the rest of the night. Make sure the details are correct.
-            </p>
-
-            <ul className="text-sm text-neutral-400 mb-6 space-y-1">
-              <li><span className="font-medium text-white">Name:</span> {name || '(none)'}</li>
-              <li><span className="font-medium text-white">Type:</span> {kind}</li>
-              <li><span className="font-medium text-white">Address:</span> {address || '(none)'}</li>
-            </ul>
-
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowConfirm(false)}
-                className="text-neutral-400 hover:text-white px-3 py-2"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmPublish}
-                disabled={submitting}
-                className="bg-yellow-400 text-black font-medium px-4 py-2 rounded-lg hover:bg-yellow-300 disabled:opacity-60"
-              >
-                Confirm
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      {/* Actions */}
+      <div className="mt-6 flex items-center gap-3">
+        <button
+          onClick={onPublish}
+          disabled={saving}
+          className="rounded-md bg-white px-4 py-2 text-sm font-medium text-black hover:opacity-80 disabled:opacity-50"
+        >
+          {saving ? 'Publishing…' : 'Publish for Tonight'}
+        </button>
+        {msg && <span className="text-sm text-neutral-300">{msg}</span>}
+      </div>
+    </main>
   );
 }

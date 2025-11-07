@@ -1,28 +1,24 @@
-// src/app/api/houseparty/tonight/route.ts
-export const runtime = 'nodejs';       // we use firebase-admin
-export const dynamic = 'force-dynamic';// this route depends on query/time
-export const revalidate = 0;           // no caching; always fresh
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { nightKey } from '@/lib/dates';
 
 export async function GET() {
   try {
-    const db = adminDb();
     const nk = nightKey(new Date());
-
-    // Admin SDK query for tonight's active houseparties
-    const snap = await db
+    const snap = await adminDb()
       .collection('houseparties')
       .where('nightKey', '==', nk)
-      .where('status', 'in', ['active', null]) // tolerate missing status
+      .where('status', '==', 'active')
       .get();
 
     const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-
     return NextResponse.json({ items }, { status: 200 });
-  } catch (err: any) {
-    console.error('[GET /api/houseparty/tonight]', err);
-    return new NextResponse('Failed to load houseparties', { status: 500 });
+  } catch (e) {
+    console.error('[GET /api/houseparty/tonight]', e);
+    return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }
