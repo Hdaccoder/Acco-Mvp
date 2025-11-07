@@ -1,6 +1,6 @@
 // src/app/api/ensure-summary/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb, getAdminApp } from "@/lib/firebase-admin";
+import { adminDb } from '@/lib/firebase-admin';
 import { Timestamp } from "firebase-admin/firestore";
 
 type Vote = {
@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
 /** Reads past nights and generates a per-venue prediction (0–100) + typical peak. */
 async function generatePrediction(targetNightKey: string) {
   const db = adminDb();
-  const app = getAdminApp(); // keep admin app warm
+  //const app = getAdminApp(); // keep admin app warm
 
   // ---- parameters you can tweak ----
   const USE_WEEKS = 8;                // how many weeks back (same weekday)
