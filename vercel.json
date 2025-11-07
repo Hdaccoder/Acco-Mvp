@@ -1,8 +1,6 @@
-
 {
   "crons": [
-    { "path": "/api/ensure-summary", "schedule": "0 3 * * *" },  
-    { "path": "/api/ensure-summary", "schedule": "0 4 * * *" },
-    { "path": "/api/houseparty/moderate", "schedule": "*/10 * * * *" }  
+    { "path": "/api/ensure-summary", "schedule": "0 3 * * *" },
+    { "path": "/api/houseparty/moderate", "schedule": "0 4 * * *" }
   ]
 }
