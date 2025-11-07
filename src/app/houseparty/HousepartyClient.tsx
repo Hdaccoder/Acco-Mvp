@@ -1,279 +1,209 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import MapPicker from '@/components/MapPicker';
-import { PartyKind } from '@/lib/houseparty';
+import { useState } from 'react';
+import { saveHouseparty } from '@/lib/housepartyStore';
 import { nightKey } from '@/lib/dates';
+import dynamic from 'next/dynamic';
 
-export default function HousepartyPage() {
-  // Default times: tonight 20:00–02:00
-  const defaults = useMemo(() => {
-    const now = new Date();
-    const nk = nightKey(now);
-    const start = new Date();
-    start.setHours(20, 0, 0, 0);
-    const end = new Date(start);
-    end.setDate(end.getDate() + (start.getHours() >= 18 ? 1 : 0));
-    end.setHours(2, 0, 0, 0);
+// Lazy load map picker (client-only)
+const MapPicker = dynamic(() => import('@/components/MapPicker'), {
+  ssr: false,
+});
 
-    const pad = (n: number) => `${n}`.padStart(2, '0');
-    const toLocalInput = (d: Date) =>
-      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
-        d.getHours()
-      )}:${pad(d.getMinutes())}`;
+type LatLng = { lat: number; lng: number };
 
-    return { nk, startStr: toLocalInput(start), endStr: toLocalInput(end) };
-  }, []);
-
-  // Form state
-  const [name, setName] = useState('');
-  const [kind, setKind] = useState<(typeof PartyKind)[number]>('all-night');
+export default function HousepartyClient() {
+  const [kind, setKind] = useState<'pres' | 'afters' | 'all-night'>('all-night');
+  const [startsAt, setStartsAt] = useState('');
+  const [endsAt, setEndsAt] = useState('');
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [startsAt, setStartsAt] = useState(defaults.startStr);
-  const [endsAt, setEndsAt] = useState(defaults.endStr);
+  const [name, setName] = useState('');
+  const [location, setLocation] = useState<LatLng | null>(null);
 
-  // UI state
-  const [status, setStatus] = useState<'idle' | 'confirm' | 'submitting' | 'success' | 'error'>(
-    'idle'
-  );
-  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
-  const openConfirm = (e: React.FormEvent) => {
+  const night = nightKey(new Date());
+
+  function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-
-    if (!coords) {
-      setError('Please choose a location on the map.');
+    if (!location) {
+      alert('Please drop a pin on the map to set your houseparty location.');
       return;
     }
-    if (!name.trim()) {
-      setError('Please provide a name for the houseparty.');
-      return;
-    }
+    setShowConfirm(true);
+  }
 
-    setStatus('confirm');
-  };
-
-  const actuallySubmit = async () => {
-    setStatus('submitting');
-    setError(null);
+  async function confirmPublish() {
+    if (!location) return; // type guard
 
     try {
-      const res = await fetch('/api/houseparty', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          kind,
-          address,
-          notes,
-          location: coords,
-          startsAt: new Date(startsAt).toISOString(),
-          endsAt: new Date(endsAt).toISOString(),
-        }),
+      setSubmitting(true);
+      await saveHouseparty({
+        name: name.trim() || 'Unnamed party',
+        kind,
+        address: address.trim(),
+        notes: notes.trim(),
+        nightKey: night,
+        location, // non-null because of the guard above
+        startsAt: startsAt || null,
+        endsAt: endsAt || null,
       });
-
-      if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(msg || 'Failed to submit.');
-      }
-
-      setStatus('success');
-      // Clear fields except times/kind
-      setName('');
-      setAddress('');
-      setNotes('');
-      setCoords(null);
-    } catch (err: any) {
-      setStatus('error');
-      setError(err?.message ?? 'Something went wrong.');
+      alert('✅ Houseparty added for tonight!');
+      window.location.href = '/houseparties';
+    } catch (err) {
+      console.error('Error publishing houseparty:', err);
+      alert('Something went wrong while publishing.');
+    } finally {
+      setSubmitting(false);
+      setShowConfirm(false);
     }
-  };
-
-  const closeConfirm = () => {
-    if (status === 'confirm') setStatus('idle');
-  };
+  }
 
   return (
-    <main className="container mx-auto max-w-3xl px-4 py-6 md:py-10 text-white">
-      <h1 className="text-3xl font-semibold tracking-tight text-white">
-        Add a Houseparty (Tonight)
+    <div className="max-w-2xl mx-auto px-4 py-8 text-white">
+      <h1 className="text-3xl font-semibold mb-2">
+        Add a Houseparty <span className="text-yellow-400">(Tonight)</span>
       </h1>
-      <p className="mt-2 text-sm text-gray-300">
+      <p className="text-neutral-400 mb-8">
         Share your pre’s, afters, or all-night party for tonight so people can find it.
       </p>
 
-      <form onSubmit={openConfirm} className="mt-6 space-y-6">
-        {/* Name */}
-        <label className="block">
-          <span className="mb-1 block text-sm font-medium text-gray-100">Name</span>
-          <input
-            type="text"
-            required
-            placeholder="e.g., Park Road Pre’s"
-            className="w-full rounded-md border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={60}
-          />
-          <p className="mt-1 text-xs text-gray-500">Give it a short, clear title (max 60 chars).</p>
-        </label>
-
+      <form onSubmit={onSubmit} className="space-y-6">
         {/* Type */}
-        <fieldset className="space-y-3">
-          <legend className="text-sm font-medium text-gray-100">Type</legend>
-          <div className="flex flex-wrap gap-3">
+        <div>
+          <label className="block text-sm font-medium mb-2">Type</label>
+          <div className="flex gap-3">
             {(['pres', 'afters', 'all-night'] as const).map((k) => (
-              <label
+              <button
                 key={k}
-                className={`cursor-pointer rounded-full border px-4 py-2 text-sm capitalize transition ${
+                type="button"
+                onClick={() => setKind(k)}
+                className={`px-4 py-2 rounded-full border transition ${
                   kind === k
-                    ? 'bg-white text-black border-white'
-                    : 'border-gray-600 text-gray-300 hover:border-gray-400'
+                    ? 'bg-yellow-400 text-black'
+                    : 'border-neutral-700 text-neutral-300 hover:border-yellow-400'
                 }`}
               >
-                <input
-                  type="radio"
-                  name="kind"
-                  value={k}
-                  className="sr-only"
-                  checked={kind === k}
-                  onChange={() => setKind(k)}
-                />
                 {k === 'pres' ? "Pre's" : k === 'afters' ? 'Afters' : 'All Night'}
-              </label>
+              </button>
             ))}
           </div>
-        </fieldset>
+        </div>
 
-        {/* Time inputs */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-gray-100">Starts</span>
+        {/* Name */}
+        <div>
+          <label className="block text-sm font-medium mb-2">Name</label>
+          <input
+            type="text"
+            placeholder="e.g., DJ Mike’s Bash"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full p-3 bg-neutral-900 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-yellow-400"
+          />
+        </div>
+
+        {/* Times */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">Starts</label>
             <input
               type="datetime-local"
-              required
-              className="w-full rounded-md border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white"
               value={startsAt}
               onChange={(e) => setStartsAt(e.target.value)}
+              className="w-full p-3 bg-neutral-900 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-yellow-400"
             />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-gray-100">Ends</span>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2">Ends</label>
             <input
               type="datetime-local"
-              required
-              className="w-full rounded-md border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white"
               value={endsAt}
               onChange={(e) => setEndsAt(e.target.value)}
+              className="w-full p-3 bg-neutral-900 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-yellow-400"
             />
-          </label>
+          </div>
         </div>
 
         {/* Address */}
-        <label className="block">
-          <span className="mb-1 block text-sm font-medium text-gray-100">Address / Building</span>
+        <div>
+          <label className="block text-sm font-medium mb-2">Address / Building</label>
           <input
             type="text"
-            required
-            placeholder="e.g., 12 Park Rd, Flat 3A, L39 …"
-            className="w-full rounded-md border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white"
+            placeholder="e.g., 12 Park Rd, Flat 3A, L39 ..."
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            maxLength={200}
+            className="w-full p-3 bg-neutral-900 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-yellow-400"
           />
-        </label>
-
-        {/* Notes */}
-        <label className="block">
-          <span className="mb-1 block text-sm font-medium text-gray-100">Notes (optional)</span>
-          <textarea
-            placeholder="Anything guests should know? e.g., ‘Text on arrival’, ‘Bring your own drinks’, ‘Quiet after midnight’…"
-            className="min-h-[96px] w-full rounded-md border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            maxLength={500}
-          />
-          <p className="mt-1 text-xs text-gray-500">Up to 500 characters.</p>
-        </label>
-
-        {/* Map picker */}
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-100">Location</span>
-            {coords && (
-              <span className="text-xs text-gray-400">
-                {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
-              </span>
-            )}
-          </div>
-          <MapPicker value={coords} onChange={setCoords} />
-          <p className="mt-2 text-xs text-gray-500">Click the map to drop or move the pin.</p>
         </div>
 
-        {/* Submit */}
-        <div className="flex items-center gap-3">
+        {/* Notes */}
+        <div>
+          <label className="block text-sm font-medium mb-2">Notes (optional)</label>
+          <textarea
+            placeholder="Anything guests should know? e.g., ‘Text on arrival’, ‘Bring your own drinks’, ‘Quiet after midnight’..."
+            maxLength={500}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="w-full p-3 h-28 bg-neutral-900 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-yellow-400"
+          />
+          <p className="text-sm text-neutral-500 mt-1">Up to 500 characters.</p>
+        </div>
+
+        {/* Map */}
+        <div>
+          <label className="block text-sm font-medium mb-2">Location</label>
+          {/* MapPicker.value expects a non-null LatLng in your codebase; pass undefined when empty */}
+          <MapPicker value={location ?? undefined} onChange={setLocation} />
+        </div>
+
+        {/* Publish */}
+        <div className="pt-4">
           <button
             type="submit"
-            disabled={status === 'submitting'}
-            className="inline-flex items-center rounded-md bg-white px-4 py-2 text-sm font-medium text-black hover:opacity-80 disabled:opacity-50"
+            disabled={submitting}
+            className="bg-yellow-400 text-black font-medium rounded-lg px-6 py-3 hover:bg-yellow-300 disabled:opacity-60"
           >
-            {status === 'submitting' ? 'Submitting…' : 'Publish for Tonight'}
+            {submitting ? 'Publishing...' : 'Publish for Tonight'}
           </button>
-          {status === 'success' && (
-            <span className="text-sm text-green-400">Added! It’ll appear shortly.</span>
-          )}
-          {status === 'error' && <span className="text-sm text-red-400">{error}</span>}
         </div>
       </form>
 
-      {/* Confirm modal */}
-      {status === 'confirm' && (
-        <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="hp-confirm-title"
-        >
-          <div className="w-full max-w-md rounded-xl border border-white/10 bg-gray-900 p-5 shadow-xl">
-            <h2 id="hp-confirm-title" className="text-lg font-semibold text-white">
-              Confirm publish?
-            </h2>
-            <p className="mt-2 text-sm text-gray-300">
-              Once you publish a houseparty, you <span className="font-semibold">cannot take it
-              down for the rest of the night</span>. Make sure the details are correct.
+      {/* Simple confirm dialog (no framer-motion) */}
+      {showConfirm && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999]">
+          <div className="bg-neutral-950 p-6 rounded-xl shadow-xl w-[90%] max-w-md border border-neutral-800">
+            <h2 className="text-lg font-semibold mb-3">Confirm publish?</h2>
+            <p className="text-neutral-300 text-sm mb-4">
+              Once you publish a houseparty,{' '}
+              <span className="font-semibold text-yellow-400">you cannot take it down</span> for the rest of the night. Make sure the details are correct.
             </p>
 
-            <div className="mt-4 space-y-1 text-xs text-gray-400">
-              <div><span className="text-gray-500">Name:</span> {name || '—'}</div>
-              <div><span className="text-gray-500">Type:</span> {kind}</div>
-              <div><span className="text-gray-500">Starts:</span> {startsAt}</div>
-              <div><span className="text-gray-500">Ends:</span> {endsAt}</div>
-              <div><span className="text-gray-500">Address:</span> {address || '—'}</div>
-              {notes?.trim() && <div><span className="text-gray-500">Notes:</span> {notes}</div>}
-            </div>
+            <ul className="text-sm text-neutral-400 mb-6 space-y-1">
+              <li><span className="font-medium text-white">Name:</span> {name || '(none)'}</li>
+              <li><span className="font-medium text-white">Type:</span> {kind}</li>
+              <li><span className="font-medium text-white">Address:</span> {address || '(none)'}</li>
+            </ul>
 
-            <div className="mt-5 flex items-center justify-end gap-3">
+            <div className="flex justify-end gap-3">
               <button
-                type="button"
-                onClick={closeConfirm}
-                className="rounded-md border border-gray-600 px-3 py-2 text-sm text-gray-200 hover:bg-gray-800"
+                onClick={() => setShowConfirm(false)}
+                className="text-neutral-400 hover:text-white px-3 py-2"
               >
-                Go back
+                Cancel
               </button>
               <button
-                type="button"
-                onClick={actuallySubmit}
-                className="rounded-md bg-white px-3 py-2 text-sm font-medium text-black hover:opacity-80"
+                onClick={confirmPublish}
+                disabled={submitting}
+                className="bg-yellow-400 text-black font-medium px-4 py-2 rounded-lg hover:bg-yellow-300 disabled:opacity-60"
               >
-                Yes, publish
+                Confirm
               </button>
             </div>
           </div>
         </div>
       )}
-    </main>
+    </div>
   );
 }

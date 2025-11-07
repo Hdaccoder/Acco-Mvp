@@ -1,4 +1,21 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "houseparties",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "nightKey", "order": "DESCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "houseparties",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "nightKey", "order": "DESCENDING" },
+        { "fieldPath": "startsAtTs", "order": "DESCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }
