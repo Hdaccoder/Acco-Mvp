@@ -1,167 +1,138 @@
+// src/app/admin/houseparties/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
-import {
-  collection,
-  getDocs,
-  type DocumentData,
-} from 'firebase/firestore';
-import { signOut } from 'firebase/auth';
-import { getClientDb, getClientAuth, getIdTokenSafe } from '@/lib/firebase';
-// from src/app/admin/houseparties/page.tsx
-import { useRequireAdmin } from '../../../hooks/useRequireAdmin';
-
+import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
+import type { DocumentData } from 'firebase/firestore';
+import { getClientDb } from '@/lib/firebase';
+import { useRequireAdmin } from '@/hooks/useRequireAdmin';
 import AdminLogin from '@/components/AdminLogin';
 
 type Houseparty = {
   id: string;
-  name?: string;
-  address?: string;
-  kind?: 'pres' | 'afters' | 'all-night' | string;
-  status?: 'pending' | 'active' | 'rejected';
-  submittedBy?: string;
-  createdAt?: any;
-  notes?: string;
+  [key: string]: any;
 };
 
 export default function AdminHousepartyPage() {
-  const authState = useRequireAdmin(); // 'loading' | 'authorized' | 'unauthorized'
+  const { isAdmin, loading } = useRequireAdmin();
   const [pending, setPending] = useState<Houseparty[]>([]);
-  const [loading, setLoading] = useState(true);
-  const db = getClientDb();
+  const [busy, setBusy] = useState(false);
 
+  // Only load data when we KNOW the user is an admin
   useEffect(() => {
-    if (authState !== 'authorized') return;
+    const load = async () => {
+      if (!isAdmin) return;
+      const db = getClientDb();
+      const snap = await getDocs(collection(db, 'houseparties'));
+      const items: Houseparty[] = [];
 
-    let cancelled = false;
-    async function loadPending() {
-      try {
-        const snap = await getDocs(collection(db, 'houseparties'));
-        if (cancelled) return;
+      snap.forEach((d) => {
+        const data = d.data() as DocumentData;
+        // Show only pending / flagged items – adjust as you like
+        if (data.status === 'pending' || data.status === 'flagged') {
+          items.push({ id: d.id, ...data });
+        }
+      });
 
-        const items = snap.docs
-          .map((d) => {
-            const data = d.data() as DocumentData;
-            return {
-              id: d.id,
-              name: data.name ?? '',
-              address: data.address ?? '',
-              kind: data.kind ?? '',
-              status: data.status ?? 'pending',
-              submittedBy: data.submittedBy ?? '',
-              createdAt: data.createdAt,
-              notes: data.notes ?? '',
-            } as Houseparty;
-          })
-          .filter((p) => p.status === 'pending');
+      setPending(items);
+    };
 
-        setPending(items);
-      } catch (e) {
-        console.error('Failed to load pending houseparties:', e);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    loadPending();
-    return () => { cancelled = true; };
-  }, [authState, db]);
+    load().catch((err) => console.error('[admin] load error', err));
+  }, [isAdmin]);
 
   async function moderate(id: string, action: 'approve' | 'reject') {
+    if (!isAdmin) return;
+    setBusy(true);
     try {
-      const token = await getIdTokenSafe();
-      const res = await fetch('/api/admin/houseparties/moderate', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ id, action }),
-      });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error(j?.error || 'Failed');
-      }
-      setPending(prev => prev.filter(p => p.id !== id));
+      const db = getClientDb();
+      const ref = doc(db, 'houseparties', id);
+      const status = action === 'approve' ? 'active' : 'rejected';
+      await updateDoc(ref, { status });
+      setPending((prev) => prev.filter((p) => p.id !== id));
     } catch (e) {
-      console.error('Moderation failed', e);
-      alert('Moderation failed.');
+      console.error('[admin] moderate error', e);
+      alert('Something went wrong updating this houseparty.');
+    } finally {
+      setBusy(false);
     }
   }
 
-  function doSignOut() {
-    const auth = getClientAuth();
-    signOut(auth).catch(() => {});
+  // -----------------------------
+  // RENDER
+  // -----------------------------
+  if (loading) {
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <p className="text-neutral-200">Checking admin access…</p>
+      </main>
+    );
   }
 
+  // Not an admin → show login UI
+  if (!isAdmin) {
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <AdminLogin />
+      </main>
+    );
+  }
+
+  // Admin view
   return (
-    <div className="max-w-3xl mx-auto px-4 py-10">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold">Houseparty Moderation</h1>
-        {authState === 'authorized' ? (
-          <button
-            onClick={doSignOut}
-            className="text-sm rounded-lg border border-neutral-700 px-3 py-1.5 hover:bg-neutral-800"
-          >
-            Sign out
-          </button>
-        ) : null}
-      </div>
+    <main className="max-w-3xl mx-auto px-4 py-12 space-y-6">
+      <h1 className="text-3xl font-semibold mb-4">Houseparty Moderation</h1>
+      {busy && (
+        <p className="text-sm text-yellow-300">
+          Updating… please wait a moment.
+        </p>
+      )}
 
-      {authState === 'loading' && <p className="opacity-70">Checking permissions…</p>}
+      {pending.length === 0 ? (
+        <p className="text-neutral-300">No houseparties waiting for review.</p>
+      ) : (
+        <div className="space-y-4">
+          {pending.map((p) => (
+            <div
+              key={p.id}
+              className="bg-neutral-900 border border-neutral-700 rounded-lg p-4 flex flex-col gap-2"
+            >
+              <div className="flex justify-between items-start gap-4">
+                <div>
+                  <h2 className="font-semibold text-lg">{p.title ?? 'Untitled houseparty'}</h2>
+                  <p className="text-sm text-neutral-300">
+                    Host: {p.hostName ?? 'Unknown'}
+                  </p>
+                  {p.address && (
+                    <p className="text-sm text-neutral-400">{p.address}</p>
+                  )}
+                  {p.notes && (
+                    <p className="text-sm text-neutral-400 mt-1">
+                      Notes: {p.notes}
+                    </p>
+                  )}
+                </div>
+              </div>
 
-      {authState === 'unauthorized' && (
-        <div className="flex items-start justify-center">
-          <AdminLogin />
+              <div className="flex gap-3 mt-3">
+                <button
+                  disabled={busy}
+                  onClick={() => moderate(p.id, 'approve')}
+                  className="px-3 py-1 rounded-md bg-green-600 hover:bg-green-500 text-sm"
+                >
+                  Approve
+                </button>
+                <button
+                  disabled={busy}
+                  onClick={() => moderate(p.id, 'reject')}
+                  className="px-3 py-1 rounded-md bg-red-600 hover:bg-red-500 text-sm"
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
-
-      {authState === 'authorized' && (
-        <>
-          {loading ? (
-            <p className="opacity-70">Loading…</p>
-          ) : pending.length === 0 ? (
-            <p className="opacity-70">No pending submissions.</p>
-          ) : (
-            <div className="space-y-4">
-              {pending.map((p) => (
-                <div key={p.id} className="rounded-xl bg-neutral-900 border border-neutral-800 p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <div className="text-lg font-medium">{p.name || 'Untitled houseparty'}</div>
-                      <div className="text-sm opacity-70">{p.address}</div>
-                      <div className="text-sm opacity-70 mt-1">Type: {p.kind}</div>
-                      {p.notes ? (
-                        <div className="text-sm opacity-90 mt-2">
-                          <span className="opacity-60">Notes:</span> {p.notes}
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className="shrink-0 flex gap-2">
-                      <button
-                        onClick={() => moderate(p.id, 'approve')}
-                        className="px-3 py-1 rounded-lg bg-green-600 hover:bg-green-700 text-sm"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => moderate(p.id, 'reject')}
-                        className="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-sm"
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 text-xs opacity-60">
-                    ID: {p.id} {p.submittedBy ? `· Submitted by ${p.submittedBy}` : ''}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-    </div>
+    </main>
   );
 }

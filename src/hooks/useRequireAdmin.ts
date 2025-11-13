@@ -1,33 +1,36 @@
 // src/hooks/useRequireAdmin.ts
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { User } from 'firebase/auth';
 import { onAuthStateChanged } from 'firebase/auth';
 import { getClientAuth } from '@/lib/firebase';
 
-function listFromEnv(key: string): string[] {
-  const raw = process.env[key] || '';
-  return raw.split(',').map(s => s.trim()).filter(Boolean);
-}
+// 🔐 Only this email is allowed to use the admin tools.
+const ADMIN_EMAIL = 'paul.is.in.power@gmail.com';
 
-/** Returns 'loading' | 'authorized' | 'unauthorized' */
 export function useRequireAdmin() {
-  const [state, setState] = useState<'loading' | 'authorized' | 'unauthorized'>('loading');
-  const adminEmails = useMemo(() => listFromEnv('NEXT_PUBLIC_ADMIN_EMAILS'), []);
-  const adminUids   = useMemo(() => listFromEnv('NEXT_PUBLIC_ADMIN_UIDS'), []);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const auth = getClientAuth();
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      if (!user) return setState('unauthorized');
 
-      const emailOk = user.email && adminEmails.includes(user.email);
-      const uidOk   = adminUids.length > 0 && adminUids.includes(user.uid);
-      setState(emailOk || uidOk ? 'authorized' : 'unauthorized');
+    const unsub = onAuthStateChanged(auth, (u) => {
+      console.log('[admin] auth state changed. User:', u?.email ?? 'none');
+      setUser(u);
+      setLoading(false);
     });
+
     return () => unsub();
-  }, [adminEmails, adminUids]);
+  }, []);
 
-  return state;
+  const isAdmin =
+    !!user &&
+    !!user.email &&
+    user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+
+  console.log('[admin] isAdmin:', isAdmin);
+
+  return { user, loading, isAdmin };
 }
-
