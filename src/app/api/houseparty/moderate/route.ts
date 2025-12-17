@@ -1,3 +1,4 @@
+// src/app/api/admin/houseparties/moderate/route.ts
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -5,43 +6,47 @@ export const revalidate = 0;
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 
-const THRESHOLD = 3; // unique reporters
-
-export async function POST() {
+/**
+ * Manual moderation endpoint used by the admin UI.
+ *
+ * Expected JSON body:
+ * {
+ *   "id": "HOUSEPARTY_DOC_ID",
+ *   "action": "approve" | "reject"
+ * }
+ *
+ * Writes with Admin SDK (bypasses client rules).
+ */
+export async function POST(req: Request) {
   try {
-    const db = adminDb();
+    const body = await req.json().catch(() => ({} as any));
+    const id = (body?.id || '').toString();
+    const action = (body?.action || '').toString();
 
-    // Gather reports in last 24h
-    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-    const reports = await db
-      .collection('housepartyReports')
-      .where('createdAt', '>=', since)
-      .get();
-
-    const byParty = new Map<string, Set<string>>();
-    reports.docs.forEach((r) => {
-      const x = r.data() as any;
-      const id = x.housepartyId as string;
-      if (!id) return;
-      const set = byParty.get(id) || new Set<string>();
-      set.add(x.reporterUid || r.id); // count unique
-      byParty.set(id, set);
-    });
-
-    let hidden = 0;
-    for (const [id, set] of byParty) {
-      if (set.size >= THRESHOLD) {
-        await db.collection('houseparties').doc(id).set(
-          { status: 'hidden', hiddenAt: new Date().toISOString() },
-          { merge: true }
-        );
-        hidden++;
-      }
+    if (!id) {
+      return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+    }
+    if (action !== 'approve' && action !== 'reject') {
+      return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
 
-    return NextResponse.json({ hidden }, { status: 200 });
+    const status = action === 'approve' ? 'active' : 'rejected';
+
+    const db = adminDb();
+    await db.collection('houseparties').doc(id).set(
+      {
+        status,
+        reviewedAt: new Date().toISOString(),
+        // Optional: add more audit fields later if you want:
+        // reviewedBy: { uid: ..., email: ... }
+      },
+      { merge: true }
+    );
+
+    return NextResponse.json({ ok: true, id, status }, { status: 200 });
   } catch (e) {
-    console.error('[POST /api/houseparty/moderate]', e);
+    console.error('[POST /api/admin/houseparties/moderate]', e);
     return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }
+
