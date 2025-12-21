@@ -1,0 +1,85 @@
+#!/usr/bin/env node
+const fs = require('fs');
+const path = require('path');
+
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).filter(Boolean);
+  if (lines.length === 0) return [];
+  const headers = splitLine(lines[0]);
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const parts = splitLine(lines[i]);
+    if (parts.length === 0) continue;
+    const obj = {};
+    for (let j = 0; j < headers.length; j++) {
+      obj[headers[j]] = parts[j] ?? '';
+    }
+    rows.push(obj);
+  }
+  return rows;
+}
+
+function splitLine(line) {
+  const out = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i+1] === '"') { cur += '"'; i++; } else { inQuotes = !inQuotes; }
+      continue;
+    }
+    if (ch === ',' && !inQuotes) {
+      out.push(cur);
+      cur = '';
+      continue;
+    }
+    cur += ch;
+  }
+  out.push(cur);
+  return out.map(s => s.trim());
+}
+
+function toTs(venues) {
+  const header = `// Generated from data/food_venues.csv - do not edit by hand
+export type FoodVenue = {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  baseline?: number;
+  city?: string;
+};
+
+export const FOOD_VENUES: FoodVenue[] = [`;
+
+  const rows = venues.map(v => {
+    const id = String(v.id || v.ID || v.Id || '').replace(/"/g, '\\"');
+    const name = String(v.name || v.NAME || v.Name || '').replace(/"/g, '\\"');
+    const lat = Number(v.lat || v.Lat || v.latitude || '') || 0;
+    const lng = Number(v.lng || v.Lng || v.longitude || '') || 0;
+    const baseline = v.baseline !== undefined && v.baseline !== '' ? Number(v.baseline) : undefined;
+    const city = v.city || v.cityName || v.City || '';
+    return `  { id: "${id}", name: "${name}", lat: ${lat}, lng: ${lng}${baseline!==undefined?`, baseline: ${baseline}`:''}${city?`, city: "${String(city).replace(/"/g, '\\"')}"`:''} },`;
+  });
+
+  return header + '\n' + rows.join('\n') + '\n];\n';
+}
+
+function main() {
+  const argv = process.argv.slice(2);
+  if (argv.length === 0) {
+    console.error('Usage: node scripts/import_food_venues.js path/to/food_venues.csv');
+    process.exit(2);
+  }
+  const src = path.resolve(argv[0]);
+  if (!fs.existsSync(src)) { console.error('File not found:', src); process.exit(2); }
+  const text = fs.readFileSync(src, 'utf8');
+  const rows = parseCSV(text);
+  const ts = toTs(rows);
+  const outPath = path.resolve('src','lib','food_venues.ts');
+  fs.writeFileSync(outPath, ts, 'utf8');
+  console.log('Wrote', outPath, 'with', rows.length, 'venues');
+}
+
+main();

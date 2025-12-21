@@ -74,13 +74,17 @@ export default function FoodPage() {
     else setUserCity('the North West');
   }, [loc]);
 
-  // Filter venues by distance from user (configurable radius). If no loc, show all.
+  // Filter venues by selected city or distance from user (configurable radius).
+  // If a city is selected, always filter by that city regardless of location permission.
   const filteredVenues = useMemo(() => {
+    if (userCity) {
+      return FOOD_VENUES.filter((v) => v.city === userCity);
+    }
+
     if (!loc) {
-      // when the user hasn't given location, prefer filtering by selected city if present
-      if (userCity) return FOOD_VENUES.filter((v) => v.city === userCity);
       return FOOD_VENUES;
     }
+
     const radiusMeters = Math.round(radiusMiles * 1609.34);
     const toRad = (x: number) => (x * Math.PI) / 180;
     const haversine = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
@@ -91,7 +95,7 @@ export default function FoodPage() {
       return 2 * R * Math.asin(Math.sqrt(A));
     };
     return FOOD_VENUES.filter((v) => haversine(loc, { lat: v.lat, lng: v.lng }) <= radiusMeters);
-  }, [loc, radiusMiles]);
+  }, [loc, radiusMiles, userCity]);
 
   // From filtered venues pick the top N by combined score (mock: baseline + weighted tallies)
   const topVenues = useMemo(() => {
