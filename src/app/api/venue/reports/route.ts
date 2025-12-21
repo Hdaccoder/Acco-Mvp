@@ -4,6 +4,7 @@ export const revalidate = 0;
 
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
+import type { QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import { nightKey as nkFn } from '@/lib/dates';
 
 export async function GET(req: Request) {
@@ -22,7 +23,7 @@ export async function GET(req: Request) {
     const snap = await q.get();
 
     const byVenue: Record<string, { count: number; entries: { reason: string; createdAt: string; reporterUid?: string }[] }> = {};
-    snap.forEach((doc) => {
+    snap.forEach((doc: QueryDocumentSnapshot) => {
       const data = doc.data();
       const vid = String(data.venueId || '');
       if (!byVenue[vid]) byVenue[vid] = { count: 0, entries: [] };
