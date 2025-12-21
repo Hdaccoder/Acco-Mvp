@@ -14,6 +14,7 @@ type Props = {
   dangerScore?: number; // 0-100
   price?: number | string | null;
   reportReasons?: { key: string; label: string }[];
+  reports?: { count: number; entries: { reason: string; createdAt: string }[] };
   // Optional mode + extra metadata for expanded details
   foodMode?: boolean;
   foodMeta?: { avgPrice?: number; popularDays?: string[] };
@@ -31,6 +32,7 @@ export default function VenueCard({
   dangerScore = 0,
   price = null,
   reportReasons = undefined,
+  reports = undefined,
   foodMode = false,
   foodMeta,
   nightMeta,
@@ -62,7 +64,16 @@ export default function VenueCard({
   return (
     <div onClick={handleClick} onDoubleClick={handleDoubleClick} role="button" tabIndex={0} className={`rounded-xl bg-neutral-900/60 border p-4 flex flex-col gap-2 cursor-pointer ${dangerScore > 60 ? 'border-red-600' : 'border-neutral-800'}`}>
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">{name}</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-lg font-semibold">{name}</h3>
+          {reports && reports.count > 0 && (
+            <div title={reports.entries.map(e=>`${e.reason} ${e.createdAt?`(${e.createdAt})`:''}`).join('\n')} className="inline-flex items-center gap-1">
+              {Array.from({ length: Math.min(3, reports.count) }).map((_, i) => (
+                <span key={i} className="text-red-400 text-sm" aria-hidden>★</span>
+              ))}
+            </div>
+          )}
+        </div>
         {price !== null && price !== undefined && (
           <div className="text-sm text-neutral-300">{
             typeof price === "number" ? (

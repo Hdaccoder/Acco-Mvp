@@ -26,6 +26,7 @@ export default function FoodPage() {
     return Math.round(50 * 0.621371);
   });
   const [topN, setTopN] = useState<number>(8);
+  const [reportSummaries, setReportSummaries] = useState<Record<string, { count: number; entries: { reason: string; createdAt: string }[] }>>({});
 
   const VENUE_INDEX = Object.fromEntries(FOOD_VENUES.map((v) => [v.id, v]));
 
@@ -92,6 +93,17 @@ export default function FoodPage() {
 
         if (!active) return;
         setTallies(newTallies);
+
+        // fetch report summaries for tonight
+        try {
+          const res = await fetch(`/api/venue/reports?for=${nk}`);
+          if (res.ok) {
+            const body = await res.json();
+            setReportSummaries(body.reportsByVenue || {});
+          }
+        } catch (e) {
+          // ignore
+        }
       } catch (e) {
         console.warn('Failed to load food votes', e);
       }
@@ -259,7 +271,7 @@ export default function FoodPage() {
         <Link href="/food/vote" className="underline">Vote</Link> page.
       </p>
       {/* Map with colored ranks */}
-      <MapView ranks={ranks} venues={filteredVenues} tallies={tallies} userLoc={loc} foodMode />
+      <MapView ranks={ranks} venues={filteredVenues} tallies={tallies} userLoc={loc} foodMode reports={reportSummaries} />
 
       {/* Small hint for ties / not enough leaders */}
       {(stoppedForTie || leadersCount < 3) && (
@@ -335,6 +347,7 @@ export default function FoodPage() {
               price={tallies[venue.id]?.price ?? null}
               lat={venue.lat}
               lng={venue.lng}
+              reports={reportSummaries[venue.id]}
               foodMode
               foodMeta={{ avgPrice: (foodPredItems[venue.id]?.avgPrice ?? tallies[venue.id]?.price) ?? undefined, popularDays: [] }}
               reportReasons={[

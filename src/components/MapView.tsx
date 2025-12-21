@@ -33,6 +33,7 @@ const GOLD = svgPin('#F4C430');
 const SILVER = svgPin('#C0C0C0');
 const BRONZE = svgPin('#CD7F32');
 const BLUE = svgPin('#3A86FF'); // for “other places”
+const RED = svgPin('#FF3B30'); // for heavily reported venues
 
 type RankMap = Record<string, 1 | 2 | 3>;
 type VenueType = {
@@ -44,9 +45,9 @@ type VenueType = {
   city?: string;
 };
 type Tallies = Record<string, { voters: number; weighted: number; price?: number | null }>;
-type Props = { ranks?: RankMap; venues?: VenueType[]; foodMode?: boolean; tallies?: Tallies; userLoc?: { lat: number; lng: number } | null };
+type Props = { ranks?: RankMap; venues?: VenueType[]; foodMode?: boolean; tallies?: Tallies; userLoc?: { lat: number; lng: number } | null; reports?: Record<string, { count: number; entries: { reason: string; createdAt: string }[] }> };
 
-export default function MapView({ ranks = {}, venues, foodMode = false, tallies, userLoc = null }: Props) {
+export default function MapView({ ranks = {}, venues, foodMode = false, tallies, userLoc = null, reports = {} }: Props) {
   const mapRef = useRef<L.Map | null>(null);
   const venueLayerRef = useRef<L.LayerGroup | null>(null);
   // const hpLayerRef = useRef<L.LayerGroup | null>(null);
@@ -102,12 +103,13 @@ export default function MapView({ ranks = {}, venues, foodMode = false, tallies,
   }, []);
   
   // keep a ref of latest props so event handlers see current values without rebinding
-  const propsRef = useRef<{ foodMode: boolean; tallies?: Tallies; userLoc?: { lat: number; lng: number } | null }>({ foodMode, tallies, userLoc });
+  const propsRef = useRef<{ foodMode: boolean; tallies?: Tallies; userLoc?: { lat: number; lng: number } | null; reports?: Record<string, { count: number; entries: { reason: string; createdAt: string }[] }> }>({ foodMode, tallies, userLoc, reports });
   useEffect(() => {
     propsRef.current.foodMode = foodMode;
     propsRef.current.tallies = tallies;
     propsRef.current.userLoc = userLoc;
-  }, [foodMode, tallies, userLoc]);
+    propsRef.current.reports = reports;
+  }, [foodMode, tallies, userLoc, reports]);
 
   // simple haversine helper for walking time
   function haversineMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
@@ -129,7 +131,10 @@ export default function MapView({ ranks = {}, venues, foodMode = false, tallies,
 
     (venues || VENUES).forEach((v) => {
       const r = ranks[v.id];
-      const icon = r === 1 ? GOLD : r === 2 ? SILVER : r === 3 ? BRONZE : BLUE;
+      const reportsFor = propsRef.current?.reports?.[v.id];
+      const reportCount = reportsFor?.count ?? 0;
+      // use red icon when 3 or more reports
+      const icon = reportCount >= 3 ? RED : (r === 1 ? GOLD : r === 2 ? SILVER : r === 3 ? BRONZE : BLUE);
 
       const marker = L.marker([v.lat, v.lng], { icon, riseOnHover: true }).addTo(group);
       marker.bindTooltip(`${v.name}${rankText(r)}`, { sticky: true, direction: 'top' });
@@ -175,7 +180,12 @@ export default function MapView({ ranks = {}, venues, foodMode = false, tallies,
           }
           const priceText = typeof price === 'number' ? `Avg: £${Math.round(price)}` : '';
           const parts = [escapeHtml(v.name), priceText, walkText].filter(Boolean);
-          const html = `<div style="min-width:140px">${parts.map(p => `<div>${escapeHtml(p)}</div>`).join('')}</div>`;
+          let html = `<div style="min-width:140px">${parts.map(p => `<div>${escapeHtml(p)}</div>`).join('')}</div>`;
+          if (reportCount >= 1) {
+            const entries = propsRef.current?.reports?.[v.id]?.entries || [];
+            const repHtml = `<div style="margin-top:8px"><strong style="color:#ff3b30">Reports (${entries.length}):</strong><ul style="margin:6px 0 0 14px;padding:0">${entries.map(e=>`<li>${escapeHtml(e.reason)} ${e.createdAt?`(${escapeHtml(e.createdAt)})`:''}</li>`).join('')}</ul></div>`;
+            html = html.replace('</div>', `${repHtml}</div>`);
+          }
           marker.bindPopup(html, { offset: [0, -10] }).openPopup();
         } else {
           // Non-food: no popup on single click (tooltip exists). Keep behavior as before.

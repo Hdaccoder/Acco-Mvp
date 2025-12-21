@@ -95,6 +95,7 @@ export default function Page() {
   const [tallies, setTallies] = useState<Record<string, { voters: number; weighted: number }>>({});
   const [arrivalCounts, setArrivalCounts] = useState<Record<string, Record<string, number>>>({});
   const [dangerScores, setDangerScores] = useState<Record<string, number>>({});
+  const [reportSummaries, setReportSummaries] = useState<Record<string, { count: number; entries: { reason: string; createdAt: string }[] }>>({});
   const [sentiment, setSentiment] = useState<{ yesMaybe: number; no: number }>({ yesMaybe: 0, no: 0 });
   const [predItems, setPredItems] = useState<Record<string, { score: number; typicalPeak?: string | null }>>({});
   const [err, setErr] = useState<string | null>(null);
@@ -329,6 +330,17 @@ export default function Page() {
         setSentiment({ yesMaybe, no });
         // keep dangerScores at zero for now
         setDangerScores({});
+
+        // fetch report summaries for tonight
+        try {
+          const res = await fetch(`/api/venue/reports?for=${nk}`);
+          if (res.ok) {
+            const body = await res.json();
+            setReportSummaries(body.reportsByVenue || {});
+          }
+        } catch (e) {
+          // ignore
+        }
       } catch (e: any) {
         console.warn('recompute votes failed', e);
         setErr(String(e?.message || e));
@@ -380,7 +392,7 @@ export default function Page() {
       )}
 
       {/* Map with colored ranks */}
-      <MapView ranks={ranks} venues={filteredVenues} tallies={tallies} userLoc={userLocation} />
+      <MapView ranks={ranks} venues={filteredVenues} tallies={tallies} userLoc={userLocation} reports={reportSummaries} />
 
       {/* Small hint for ties / not enough leaders */}
       {(stoppedForTie || leadersCount < 3) && (
@@ -466,6 +478,7 @@ export default function Page() {
               lng={v.lng}
               peakToday={todayPeakLabel(v.id)}
               dangerScore={dangerScores[v.id] ?? 0}
+              reports={reportSummaries[v.id]}
               nightMeta={{ popularDay: pred?.typicalPeak ?? todayPeakLabel(v.id) ?? undefined, popularTimes }}
             />
           );
