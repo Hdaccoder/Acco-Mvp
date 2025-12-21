@@ -1,6 +1,9 @@
 "use client";
 import NextDynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
+import { collection, onSnapshot, getDocs } from "firebase/firestore";
+import { db, getClientDb } from "@/lib/firebase";
+import { weight } from "@/lib/heat";
 import { nightKey } from '@/lib/dates';
 import { useUserLocation } from "@/hooks/useUserLocation";
 import { FOOD_VENUES } from "@/lib/food_venues";
@@ -24,6 +27,17 @@ export default function FoodPage() {
   });
   const [topN, setTopN] = useState<number>(8);
 
+  const VENUE_INDEX = Object.fromEntries(FOOD_VENUES.map((v) => [v.id, v]));
+
+  function haversineMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+    const R = 6371000;
+    const toRad = (x: number) => (x * Math.PI) / 180;
+    const dLat = toRad(b.lat - a.lat);
+    const dLng = toRad(b.lng - a.lng);
+    const A = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(A));
+  }
+
   // Heat score (0-100) per venue from tallies
   const heatScores = useMemo(() => {
     const out: Record<string, number> = {};
@@ -33,24 +47,60 @@ export default function FoodPage() {
     return out;
   }, [tallies]);
 
-  // TODO: Replace with real food voting logic
+  // Real-time aggregation of food votes for tonight
   useEffect(() => {
+    if (!db) return;
     let active = true;
-    (async () => {
+    const nk = nightKey();
+
+    const recompute = async () => {
       try {
-        const res = await fetch('/api/food/tallies');
+        const snap = await getDocs(collection(getClientDb(), "food_nights", nk, "votes"));
         if (!active) return;
-        if (!res.ok) {
-          console.error('Failed to load food tallies', await res.text());
-          return;
+        const docs = snap.docs.map((d) => d.data());
+
+        const now = new Date();
+        const newTallies: Record<string, { voters: number; weighted: number; price?: number | null }> = {};
+
+        for (const raw of docs as any[]) {
+          const intent: "yes" | "maybe" | "no" = raw.intent || "yes";
+          const loc = raw.location && raw.location.lat != null && raw.location.lng != null ? { lat: raw.location.lat, lng: raw.location.lng } : null;
+          const selections = Array.isArray(raw.selections) ? raw.selections : [];
+
+          for (const sel of selections) {
+            const vid = sel.venueId;
+            if (!vid) continue;
+            if (!newTallies[vid]) newTallies[vid] = { voters: 0, weighted: 0, price: undefined };
+            newTallies[vid].voters += 1;
+
+            if (intent === "yes" || intent === "maybe") {
+              const venue = VENUE_INDEX[vid];
+              const metersFromVenue = loc && venue ? haversineMeters(loc, { lat: venue.lat, lng: venue.lng }) : 99999;
+
+              let updatedAt: Date | null = null;
+              if (sel.updatedAt && typeof sel.updatedAt.toDate === "function") updatedAt = sel.updatedAt.toDate();
+              else if (raw.lastEditedAt && typeof raw.lastEditedAt.toDate === "function") updatedAt = raw.lastEditedAt.toDate();
+              else if (sel.updatedAt && typeof sel.updatedAt === "number") updatedAt = new Date(sel.updatedAt);
+
+              const updatedAgoMinutes = updatedAt ? Math.max(0, Math.round((now.getTime() - updatedAt.getTime()) / 60000)) : 0;
+
+              const w = weight({ intent, metersFromVenue, updatedAgoMinutes });
+              newTallies[vid].weighted += w;
+            }
+          }
         }
-        const body = await res.json();
-        if (body?.tallies) setTallies(body.tallies);
+
+        if (!active) return;
+        setTallies(newTallies);
       } catch (e) {
-        console.error('Error fetching food tallies', e);
+        console.warn('Failed to load food votes', e);
       }
-    })();
-    return () => { active = false; };
+    };
+
+    recompute();
+    const unsub = onSnapshot(collection(getClientDb(), "food_nights", nk, "votes"), () => recompute(), (err) => console.warn('food votes listen error', err));
+
+    return () => { active = false; try { unsub(); } catch {} };
   }, []);
 
   // Derive user city from nearest food venue
@@ -109,8 +159,20 @@ export default function FoodPage() {
 
   // If a city is explicitly selected, show all venues for that city instead of just the top N
   const displayVenues = useMemo(() => {
-    if (userCity) return filteredVenues;
-    return topVenues;
+    const byVotes = (a: any, b: any) => {
+      const va = tallies[a.id]?.voters ?? 0;
+      const vb = tallies[b.id]?.voters ?? 0;
+      if (vb !== va) return vb - va;
+      const wa = tallies[a.id]?.weighted ?? 0;
+      const wb = tallies[b.id]?.weighted ?? 0;
+      if (wb !== wa) return wb - wa;
+      const ba = a.baseline ?? 0;
+      const bb = b.baseline ?? 0;
+      return bb - ba;
+    };
+
+    if (userCity) return [...filteredVenues].sort(byVotes);
+    return [...topVenues].sort(byVotes);
   }, [userCity, filteredVenues, topVenues]);
 
   const [foodPredItems, setFoodPredItems] = useState<Record<string, { score: number; avgPrice?: number | null }>>({});

@@ -1,8 +1,8 @@
 "use client";
 import NextDynamic from "next/dynamic";
-import { collection, onSnapshot, query, where, doc, getDoc } from "firebase/firestore";
+import { collection, onSnapshot, query, where, doc, getDoc, getDocs } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
-import { db } from "@/lib/firebase";
+import { db, getClientDb } from "@/lib/firebase";
 import { ensureAnon } from "@/lib/auth";
 import { nightKey } from "@/lib/dates";
 import { VENUES } from "@/lib/venues";
@@ -249,6 +249,104 @@ export default function Page() {
       }
     })();
     return () => { active = false; };
+  }, []);
+
+  // Real-time votes aggregation for tonight (food + nightlife)
+  useEffect(() => {
+    if (!db) return;
+    let active = true;
+
+    const nk = nightKey();
+
+    // recompute by reading both votes subcollections
+    const recompute = async () => {
+      try {
+        const snaps = await Promise.all([
+          getDocs(collection(getClientDb(), "nights", nk, "votes")),
+          getDocs(collection(getClientDb(), "food_nights", nk, "votes")),
+        ]);
+
+        if (!active) return;
+
+        const docs = snaps.flatMap((s) => s.docs.map((d) => d.data()));
+        const now = new Date();
+
+        const newTallies: Record<string, { voters: number; weighted: number }> = {};
+        const newArrival: Record<string, Record<string, number>> = {};
+        let yesMaybe = 0;
+        let no = 0;
+
+        for (const raw of docs as any[]) {
+          const intent: "yes" | "maybe" | "no" = raw.intent || "yes";
+
+          if (intent === "no") {
+            no += 1;
+          } else {
+            yesMaybe += 1;
+          }
+
+          const loc = raw.location && raw.location.lat != null && raw.location.lng != null ? { lat: raw.location.lat, lng: raw.location.lng } : null;
+
+          const selections = Array.isArray(raw.selections) ? raw.selections : [];
+
+          for (const sel of selections) {
+            const vid = sel.venueId;
+            if (!vid) continue;
+
+            if (!newTallies[vid]) newTallies[vid] = { voters: 0, weighted: 0 };
+            newTallies[vid].voters += 1;
+
+            // arrival window counts
+            const aw = sel.arrivalWindow || "unspecified";
+            newArrival[vid] = newArrival[vid] || {};
+            newArrival[vid][aw] = (newArrival[vid][aw] || 0) + 1;
+
+            // compute weighted contribution for yes/maybe
+            if (intent === "yes" || intent === "maybe") {
+              const venue = VENUE_INDEX[vid];
+              const metersFromVenue = loc && venue ? haversineMeters(loc, { lat: venue.lat, lng: venue.lng }) : 99999;
+
+              let updatedAt: Date | null = null;
+              if (sel.updatedAt && typeof sel.updatedAt.toDate === "function") {
+                updatedAt = sel.updatedAt.toDate();
+              } else if (raw.lastEditedAt && typeof raw.lastEditedAt.toDate === "function") {
+                updatedAt = raw.lastEditedAt.toDate();
+              } else if (sel.updatedAt && typeof sel.updatedAt === "number") {
+                updatedAt = new Date(sel.updatedAt);
+              }
+
+              const updatedAgoMinutes = updatedAt ? Math.max(0, Math.round((now.getTime() - updatedAt.getTime()) / 60000)) : 0;
+
+              const w = weight({ intent, metersFromVenue, updatedAgoMinutes });
+              newTallies[vid].weighted += w;
+            }
+          }
+        }
+
+        if (!active) return;
+        setTallies(newTallies);
+        setArrivalCounts(newArrival);
+        setSentiment({ yesMaybe, no });
+        // keep dangerScores at zero for now
+        setDangerScores({});
+      } catch (e: any) {
+        console.warn('recompute votes failed', e);
+        setErr(String(e?.message || e));
+      }
+    };
+
+    // initial recompute
+    recompute();
+
+    // listen for changes and trigger recompute when either collection updates
+    const unsub1 = onSnapshot(collection(getClientDb(), "nights", nk, "votes"), () => recompute(), (err) => setErr(String(err?.message || err)));
+    const unsub2 = onSnapshot(collection(getClientDb(), "food_nights", nk, "votes"), () => recompute(), (err) => setErr(String(err?.message || err)));
+
+    return () => {
+      active = false;
+      try { unsub1(); } catch {}
+      try { unsub2(); } catch {}
+    };
   }, []);
 
   const totalSentiment = sentiment.yesMaybe + sentiment.no;
