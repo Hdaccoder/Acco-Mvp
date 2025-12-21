@@ -107,6 +107,12 @@ export default function FoodPage() {
     return scored.slice(0, topN).map((s) => s.v);
   }, [filteredVenues, tallies, topN]);
 
+  // If a city is explicitly selected, show all venues for that city instead of just the top N
+  const displayVenues = useMemo(() => {
+    if (userCity) return filteredVenues;
+    return topVenues;
+  }, [userCity, filteredVenues, topVenues]);
+
   const [foodPredItems, setFoodPredItems] = useState<Record<string, { score: number; avgPrice?: number | null }>>({});
 
   // fetch food prediction summary for tonight
@@ -249,15 +255,15 @@ export default function FoodPage() {
       )}
 
       <div className="grid gap-4">
-        {topVenues.length === 0 ? (
+        {displayVenues.length === 0 ? (
           <div className="rounded-xl border border-neutral-800 p-4 text-sm text-neutral-400">
-            No nearby food places found within {radiusMiles} mi. Try increasing the radius or <Link href="/food">browse all</Link>.
+            No places found. Try increasing the radius or <Link href="/food">browse all</Link>.
             <div className="mt-2">
               <button onClick={() => setRadiusMiles(Math.round(100 * 0.621371))} className="px-3 py-2 rounded bg-neutral-800 border border-neutral-700">Expand to {Math.round(100 * 0.621371)} mi</button>
             </div>
           </div>
         ) : (
-          topVenues.map((venue) => (
+          displayVenues.map((venue) => (
             <VenueCard
               key={venue.id}
               id={venue.id}
