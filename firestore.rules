@@ -26,9 +26,14 @@ service cloud.firestore {
 
     // One selection entry inside a vote
     function validSelection(sel) {
+      // Only validate arrivalWindow if the field is present to avoid
+      // runtime errors when clients omit the key (or send undefined).
       return sel is map &&
              sel.venueId is string &&
-             (sel.arrivalWindow == null || sel.arrivalWindow is string);
+             (
+               // if arrivalWindow key exists, it must be null or string
+               (sel.keys().hasAny(['arrivalWindow']) ? (sel.arrivalWindow == null || sel.arrivalWindow is string) : true)
+             );
     }
 
     // Non-recursive validator for selections list (supports up to 8)
@@ -84,8 +89,8 @@ service cloud.firestore {
         (isSignedIn() && request.auth.uid == userId && doc.userId == userId) &&
         // selections
         (doc.selections is list && validSelections(doc.selections)) &&
-        // optional fields
-        validLocation(doc.location) &&
+        // optional fields: only validate location if present
+        (doc.keys().hasAny(['location']) ? validLocation(doc.location) : true) &&
         (
           doc.intent == null || (doc.intent in ['yes','maybe','no'])
         );
@@ -103,6 +108,15 @@ service cloud.firestore {
                             validVote(request.resource.data, userId);
 
       // No client deletes (keeps history stable)
+      allow delete: if false;
+    }
+
+    // -------------------------------------------------
+    // Food votes mirror nightlife votes: /food_nights/{date}/votes/{userId}
+    // -------------------------------------------------
+    match /food_nights/{date}/votes/{userId} {
+      allow read: if true;
+      allow create, update: if isSelf(userId) && validVote(request.resource.data, userId);
       allow delete: if false;
     }
 

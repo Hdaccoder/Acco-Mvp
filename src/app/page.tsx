@@ -1,8 +1,6 @@
 "use client";
-export const dynamic = "force-dynamic";
-
 import NextDynamic from "next/dynamic";
-import { collection, onSnapshot, query } from "firebase/firestore";
+import { collection, onSnapshot, query, where, doc, getDoc } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/firebase";
 import { ensureAnon } from "@/lib/auth";
@@ -37,15 +35,17 @@ function haversineMeters(
   return 2 * R * Math.asin(Math.sqrt(A));
 }
 
-/**
- * Choose up to 3 leaders (gold/silver/bronze) with tie-safety.
- * Ranking key = voters desc, then weighted desc.
- * If a tie happens at a rank boundary, we STOP assigning further ranks
- * (so you might get only gold, or gold+silver).
- */
-function computeTopRanks(tallies: Record<string, { voters: number; weighted: number }>) {
+function computeTopRanks(
+  tallies: Record<string, { voters: number; weighted: number }> ,
+  city?: string | null
+) {
   const entries = Object.entries(tallies)
     .filter(([, t]) => t.voters > 0)
+    .filter(([id]) => {
+      if (!city) return true;
+      const v = VENUE_INDEX[id];
+      return v?.city === city;
+    })
     .sort(([, a], [, b]) => {
       const byV = b.voters - a.voters;
       if (byV !== 0) return byV;
@@ -86,110 +86,37 @@ function computeTopRanks(tallies: Record<string, { voters: number; weighted: num
     stoppedForTie,
     leadersCount: Object.keys(ranks).length,
   };
+
 }
 
-export default function TonightPage() {
-  const [tallies, setTallies] = useState<
-    Record<string, { voters: number; weighted: number }>
-  >({});
-  const [arrivalCounts, setArrivalCounts] = useState<
-    Record<string, Record<string, number>>
-  >({});
-  const [sentiment, setSentiment] = useState<{ yesMaybe: number; no: number }>({
-    yesMaybe: 0,
-    no: 0,
-  });
+// Page component
+export default function Page() {
+  // Local UI state (initialized minimally so component compiles)
+  const [tallies, setTallies] = useState<Record<string, { voters: number; weighted: number }>>({});
+  const [arrivalCounts, setArrivalCounts] = useState<Record<string, Record<string, number>>>({});
+  const [dangerScores, setDangerScores] = useState<Record<string, number>>({});
+  const [sentiment, setSentiment] = useState<{ yesMaybe: number; no: number }>({ yesMaybe: 0, no: 0 });
+  const [predItems, setPredItems] = useState<Record<string, { score: number; typicalPeak?: string | null }>>({});
   const [err, setErr] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [userCity, setUserCity] = useState<string | null>(null);
+  const [radiusM, setRadiusM] = useState<number>(10000);
 
+  // read persisted city choice
   useEffect(() => {
-    let unsub = () => {};
-    let mounted = true;
-
-    (async () => {
-      await ensureAnon();
-
-      if (!db) {
-        setErr("Database not initialised. Check your .env.local values.");
-        return;
-      }
-
-      const nk = nightKey();
-      const qref = collection(db, "nights", nk, "votes");
-
-      unsub = onSnapshot(
-        query(qref),
-        (snap) => {
-          if (!mounted) return;
-          const now = Date.now();
-          const t: Record<string, { voters: number; weighted: number }> = {};
-          const arrivals: Record<string, Record<string, number>> = {};
-
-          let yesMaybe = 0;
-          let no = 0;
-
-          snap.forEach((d) => {
-            const v = d.data() as Vote;
-            if (!v) return;
-
-            if (v.intent === "no") {
-              no += 1;
-              return;
-            }
-            yesMaybe += 1;
-
-            const editedMs =
-              (v.lastEditedAt?.toMillis && v.lastEditedAt.toMillis()) || now;
-            const updatedAgoMinutes = Math.max(
-              1,
-              Math.round((now - editedMs) / 60000)
-            );
-
-            for (const sel of v.selections || []) {
-              const venue = VENUE_INDEX[sel.venueId];
-              if (!venue) continue;
-
-              // Count arrivals (for "peak tonight")
-              if (sel.arrivalWindow) {
-                arrivals[sel.venueId] ??= {};
-                arrivals[sel.venueId][sel.arrivalWindow] =
-                  (arrivals[sel.venueId][sel.arrivalWindow] ?? 0) + 1;
-              }
-
-              const meters = v.location
-                ? haversineMeters(
-                    { lat: v.location.lat, lng: v.location.lng },
-                    { lat: venue.lat, lng: venue.lng }
-                  )
-                : 1000;
-
-              const w = weight({
-                intent: v.intent === "maybe" ? "maybe" : "yes",
-                metersFromVenue: meters,
-                updatedAgoMinutes,
-              });
-
-              if (!t[sel.venueId]) t[sel.venueId] = { voters: 0, weighted: 0 };
-              t[sel.venueId].voters += 1;
-              t[sel.venueId].weighted += w;
-            }
-          });
-
-          setTallies(t);
-          setArrivalCounts(arrivals);
-          setSentiment({ yesMaybe, no });
-          setErr(null);
-        },
-        (e) => setErr(e.message)
-      );
-    })();
-
-    return () => {
-      mounted = false;
-      try {
-        unsub();
-      } catch {}
-    };
+    try {
+      const v = localStorage.getItem('userCity');
+      if (v) setUserCity(v);
+    } catch {}
   }, []);
+
+  // persist city choice
+  useEffect(() => {
+    try {
+      if (userCity) localStorage.setItem('userCity', userCity);
+      else localStorage.removeItem('userCity');
+    } catch {}
+  }, [userCity]);
 
   // Heat score (0-100) per venue from tallies
   const heatScores = useMemo(() => {
@@ -200,6 +127,50 @@ export default function TonightPage() {
     return out;
   }, [tallies]);
 
+  // Request device location once on mount (used only on homepage to show nearby venues)
+  useEffect(() => {
+    if (!('geolocation' in navigator)) return;
+    const opts: PositionOptions = { enableHighAccuracy: false, timeout: 5000, maximumAge: 5 * 60 * 1000 };
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      },
+      () => {},
+      opts
+    );
+  }, []);
+
+  // Derive user city from nearest known venue (fallback region)
+  useEffect(() => {
+    if (!userLocation) return;
+    let nearest: { city?: string; dist: number } | null = null;
+    for (const v of VENUES) {
+      const d = haversineMeters(userLocation, { lat: v.lat, lng: v.lng });
+      if (!nearest || d < nearest.dist) nearest = { city: v.city, dist: d };
+    }
+    if (nearest && nearest.city && nearest.dist < 100000) {
+      setUserCity(nearest.city);
+    } else {
+      setUserCity(null);
+    }
+  }, [userLocation]);
+
+  // persist radius to localStorage when changed
+  useEffect(() => {
+    try {
+      localStorage.setItem('nearbyRadiusM', String(radiusM));
+    } catch {}
+  }, [radiusM]);
+
+  function requestLocation() {
+    if (!('geolocation' in navigator)) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      (err) => console.warn('location denied', err),
+      { enableHighAccuracy: false, timeout: 10000 }
+    );
+  }
+
   // Order venues by heat (desc)
   const orderedVenues = useMemo(() => {
     const vs = [...VENUES];
@@ -208,13 +179,45 @@ export default function TonightPage() {
       const hb = heatScores[b.id] ?? 0;
       return hb - ha;
     });
-    return vs;
+
+    // If we know the user's city, show the top 5 popular places in that city.
+    if (userCity) {
+      return vs.filter((v) => v.city === userCity).slice(0, 5);
+    }
+
+    // Otherwise, show the top 5 venues overall.
+    return vs.slice(0, 5);
   }, [heatScores]);
+
+  // If we have a device location, compute the top venues within `radiusM` by popularity (then proximity)
+  const nearbyTop5 = useMemo(() => {
+    if (!userLocation) return null;
+    const list = VENUES.map((v) => {
+      const d = haversineMeters(userLocation, { lat: v.lat, lng: v.lng });
+      const heat = heatScores[v.id] ?? 0;
+      return { ...v, dist: d, heat };
+    })
+      .filter((x) => x.dist <= radiusM)
+      .sort((a, b) => {
+        const byHeat = b.heat - a.heat;
+        if (byHeat !== 0) return byHeat;
+        return a.dist - b.dist;
+      });
+
+    return list;
+  }, [userLocation, heatScores, radiusM]);
+
+  // When no device location, allow filtering by selected city
+  const filteredVenues = useMemo(() => {
+    if (userLocation) return nearbyTop5 ?? VENUES;
+    if (userCity) return VENUES.filter((v) => v.city === userCity);
+    return VENUES;
+  }, [userLocation, nearbyTop5, userCity]);
 
   // Compute top ranks (tie-safe)
   const { ranks, stoppedForTie, leadersCount } = useMemo(
-    () => computeTopRanks(tallies),
-    [tallies]
+    () => computeTopRanks(tallies, userCity ?? undefined),
+    [tallies, userCity]
   );
 
   // Compute "Peak tonight" label from today's arrival windows
@@ -228,13 +231,33 @@ export default function TonightPage() {
     return best?.key ?? null;
   };
 
+  // fetch nightly prediction summary (best-effort)
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const nk = nightKey();
+        if (!db) return;
+        const ref = doc(db, 'prediction_summaries', nk);
+        const snap = await getDoc(ref);
+        if (!active) return;
+        if (!snap.exists()) return;
+        const data = snap.data() as any;
+        setPredItems((data.items || {}) as Record<string, { score: number; typicalPeak?: string | null }>);
+      } catch (e) {
+        // ignore
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
   const totalSentiment = sentiment.yesMaybe + sentiment.no;
   const stayInPct =
     totalSentiment > 0 ? Math.round((sentiment.no / totalSentiment) * 100) : 0;
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Tonight in Ormskirk</h1>
+      <h1 className="text-2xl font-semibold">Tonight in {userCity ?? 'the North West'}</h1>
 
       {err ? (
         <p className="text-sm rounded-xl border border-red-500/30 bg-red-500/10 text-red-200 p-3">
@@ -259,7 +282,7 @@ export default function TonightPage() {
       )}
 
       {/* Map with colored ranks */}
-      <MapView ranks={ranks} />
+      <MapView ranks={ranks} venues={filteredVenues} tallies={tallies} userLoc={userLocation} />
 
       {/* Small hint for ties / not enough leaders */}
       {(stoppedForTie || leadersCount < 3) && (
@@ -270,11 +293,70 @@ export default function TonightPage() {
         </p>
       )}
 
+      {/* Location prompt / radius controls */}
+      <div className="mb-4">
+        {!userLocation ? (
+          <div className="rounded-md p-3 bg-neutral-900 border border-neutral-800 text-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-medium">Show nearby places</div>
+                <div className="text-neutral-400 text-xs">Allow location to see the 5 closest popular places near you.</div>
+              </div>
+              <div>
+                <button onClick={requestLocation} className="px-3 py-1 rounded-md bg-yellow-400 text-black">Allow location</button>
+              </div>
+            </div>
+            <div className="mt-3 text-sm">
+              <label className="block text-neutral-400 text-xs">Or pick a city</label>
+              <select
+                value={userCity ?? ''}
+                onChange={(e) => setUserCity(e.target.value || null)}
+                className="mt-1 w-full bg-neutral-800 rounded px-2 py-1"
+              >
+                <option value="">All regions</option>
+                {Array.from(new Set(VENUES.map((v) => v.city))).map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-md p-3 bg-neutral-900 border border-neutral-800 text-sm flex items-center justify-between">
+            <div>
+              <div className="font-medium">Nearby radius</div>
+              <div className="text-neutral-400 text-xs">Showing places within your selected range.</div>
+            </div>
+            <div className="flex items-center gap-2">
+              {[5000, 10000, 25000, 50000, 100000].map((r) => {
+                const mi = r >= 1609 ? Math.round(r / 1609.34) : null;
+                return (
+                  <button
+                    key={r}
+                    onClick={() => setRadiusM(r)}
+                    className={`px-2 py-1 rounded ${radiusM === r ? 'bg-yellow-400 text-black' : 'bg-neutral-800'}`}
+                  >
+                    {mi ? `${mi}mi` : `${r}m`}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {userLocation && (
+          <div className="text-sm text-neutral-400">
+          Showing <span className="font-medium">{(nearbyTop5 ?? []).length}</span> {(nearbyTop5 ?? []).length === 1 ? 'place' : 'places'} within <span className="font-medium">{radiusM >= 1609 ? `${Math.round(radiusM / 1609.34)}mi` : `${radiusM}m`}</span>
+        </div>
+      )}
+
       <div className="grid gap-3">
-        {orderedVenues.map((v) => {
+          {(userLocation ? (nearbyTop5 ?? []) : filteredVenues).map((v: any) => {
           const t = tallies[v.id] || { voters: 0, weighted: 0 };
           const score0to100 = heatScores[v.id] ?? 0;
-
+          const arrival = arrivalCounts[v.id] || {};
+          const popularTimes = Object.entries(arrival).sort((a,b)=>b[1]-a[1]).slice(0,3).map(x=>x[0]);
+          const pred = predItems[v.id];
           return (
             <VenueCard
               key={v.id}
@@ -285,6 +367,8 @@ export default function TonightPage() {
               lat={v.lat}
               lng={v.lng}
               peakToday={todayPeakLabel(v.id)}
+              dangerScore={dangerScores[v.id] ?? 0}
+              nightMeta={{ popularDay: pred?.typicalPeak ?? todayPeakLabel(v.id) ?? undefined, popularTimes }}
             />
           );
         })}

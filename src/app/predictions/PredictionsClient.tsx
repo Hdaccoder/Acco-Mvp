@@ -29,6 +29,7 @@ export default function PredictionsClient() {
   const [items, setItems] = useState<PredItems>({});
   const [topIds, setTopIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [city, setCity] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -46,6 +47,22 @@ export default function PredictionsClient() {
         const snap = await getDoc(ref);
 
         if (!snap.exists()) {
+          // try to trigger generation on-demand, then re-fetch
+          try {
+            await fetch('/api/ensure-summary/trigger', { method: 'POST' });
+            const reSnap = await getDoc(ref);
+            if (reSnap.exists()) {
+              const data = reSnap.data() as any;
+              setItems((data.items || {}) as PredItems);
+              setTopIds((data.top || []) as string[]);
+              setErr(null);
+              setLoading(false);
+              return;
+            }
+          } catch (e) {
+            // ignore and fallthrough to error
+          }
+
           setErr("No predictions yet for tonight.");
           setLoading(false);
           return;
@@ -64,6 +81,15 @@ export default function PredictionsClient() {
   }, []);
 
   const sorted = Object.entries(items).sort((a, b) => b[1].score - a[1].score);
+
+  const cities = Array.from(new Set(VENUES.map((v) => v.city).filter(Boolean))).sort();
+  const byCity = (c?: string | null) => {
+    if (!c) return sorted;
+    const venueIds = new Set(VENUES.filter((v) => v.city === c).map((v) => v.id));
+    return sorted.filter(([id]) => venueIds.has(id));
+  };
+  const cityList = byCity(city);
+  const topInCity = cityList.length > 0 ? cityList[0] : null;
 
   return (
     <div className="space-y-4">
@@ -85,21 +111,41 @@ export default function PredictionsClient() {
         <p className="text-sm text-neutral-400">No prediction items yet.</p>
       )}
 
-      <div className="grid gap-3">
-        {sorted.map(([id, v]) => (
-          <div
-            key={id}
-            className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 flex items-center justify-between"
-          >
-            <div>
-              <div className="font-medium">{VENUE_NAME[id] ?? id}</div>
-              <div className="text-xs text-neutral-400">
-                Typical peak: {v.typicalPeak ?? "—"}
-              </div>
-            </div>
-            <div className="text-lg font-semibold tabular-nums">{v.score}</div>
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <label className="text-sm text-neutral-400">Choose city:</label>
+          <select value={city ?? ""} onChange={(e) => setCity(e.target.value || null)} className="bg-neutral-900 border border-neutral-800 p-2 rounded">
+            <option value="">All regions</option>
+            {cities.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+
+        {topInCity ? (
+          <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/5 p-6">
+            <div className="text-sm text-yellow-300">Tonight in {city ?? 'your area'}</div>
+            <div className="text-2xl font-bold mt-2">{VENUES.find(v=>v.id===topInCity[0])?.name ?? topInCity[0]} is Acco tonight!</div>
+            <div className="text-sm text-neutral-300 mt-2">Typical peak: <span className="font-medium">{topInCity[1].typicalPeak ?? '—'}</span></div>
           </div>
-        ))}
+        ) : (
+          <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 text-sm text-neutral-400">No predicted leaders for this city yet.</div>
+        )}
+
+        <div className="grid gap-3">
+          {cityList.slice(0).map(([id, v]) => (
+            <div key={id} className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-medium">{VENUE_NAME[id] ?? id}</div>
+                  <div className="text-xs text-neutral-400">Typical peak: {v.typicalPeak ?? '—'}</div>
+                </div>
+                <div className="text-sm text-neutral-300">{v.score > 0 ? `${v.score}%` : 'Low'}</div>
+              </div>
+              <div className="text-xs text-neutral-500 mt-2">Other times: {/* placeholder - arrival windows not in summary */}—</div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

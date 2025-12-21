@@ -3,9 +3,8 @@
 
 import { useEffect, useRef } from 'react';
 import * as L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import { VENUES } from '@/lib/venues';
-import { housepartyDivIcon } from '@/lib/housepartyMarker';
+
 
 
 // ---------- Venue pin SVGs ----------
@@ -36,24 +35,38 @@ const BRONZE = svgPin('#CD7F32');
 const BLUE = svgPin('#3A86FF'); // for “other places”
 
 type RankMap = Record<string, 1 | 2 | 3>;
-type Props = { ranks?: RankMap };
+type VenueType = {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  baseline?: number;
+  city?: string;
+};
+type Tallies = Record<string, { voters: number; weighted: number; price?: number | null }>;
+type Props = { ranks?: RankMap; venues?: VenueType[]; foodMode?: boolean; tallies?: Tallies; userLoc?: { lat: number; lng: number } | null };
 
-export default function MapView({ ranks = {} }: Props) {
+export default function MapView({ ranks = {}, venues, foodMode = false, tallies, userLoc = null }: Props) {
   const mapRef = useRef<L.Map | null>(null);
   const venueLayerRef = useRef<L.LayerGroup | null>(null);
-  const hpLayerRef = useRef<L.LayerGroup | null>(null);
+  // const hpLayerRef = useRef<L.LayerGroup | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
   // Use Leaflet default pin for houseparties (no asset/path issues)
-  L.Icon.Default.mergeOptions({
-    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  });
+  // L.Icon.Default.mergeOptions removed
 
   // 1) Create map once
   useEffect(() => {
+    // Inject Leaflet CSS at runtime to avoid bundler/PostCSS processing of
+    // node_modules CSS (which can cause PostCSS/tailwind conflicts).
+    if (typeof document !== 'undefined' && !document.querySelector('link[data-leaflet-css]')) {
+      const link = document.createElement('link');
+      link.setAttribute('rel', 'stylesheet');
+      link.setAttribute('href', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
+      link.setAttribute('data-leaflet-css', '1');
+      document.head.appendChild(link);
+    }
     if (!containerRef.current || mapRef.current) return;
 
     const map = L.map(containerRef.current, {
@@ -70,7 +83,7 @@ export default function MapView({ ranks = {} }: Props) {
     }).addTo(map);
 
     venueLayerRef.current = L.layerGroup().addTo(map);
-    hpLayerRef.current = L.layerGroup().addTo(map);
+    // hpLayerRef removed
 
     const fix = () => { try { map.invalidateSize(); } catch {} };
     map.whenReady(fix);
@@ -80,13 +93,31 @@ export default function MapView({ ranks = {} }: Props) {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
       try { venueLayerRef.current?.clearLayers(); } catch {}
-      try { hpLayerRef.current?.clearLayers(); } catch {}
+      // hpLayerRef removed
       try { map.remove(); } catch {}
       mapRef.current = null;
       venueLayerRef.current = null;
-      hpLayerRef.current = null;
+
     };
   }, []);
+  
+  // keep a ref of latest props so event handlers see current values without rebinding
+  const propsRef = useRef<{ foodMode: boolean; tallies?: Tallies; userLoc?: { lat: number; lng: number } | null }>({ foodMode, tallies, userLoc });
+  useEffect(() => {
+    propsRef.current.foodMode = foodMode;
+    propsRef.current.tallies = tallies;
+    propsRef.current.userLoc = userLoc;
+  }, [foodMode, tallies, userLoc]);
+
+  // simple haversine helper for walking time
+  function haversineMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+    const R = 6371000;
+    const toRad = (x: number) => (x * Math.PI) / 180;
+    const dLat = toRad(b.lat - a.lat);
+    const dLng = toRad(b.lng - a.lng);
+    const A = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(A));
+  }
 
   // 2) Draw venue markers when ranks change
   useEffect(() => {
@@ -96,7 +127,7 @@ export default function MapView({ ranks = {} }: Props) {
 
     group.clearLayers();
 
-    VENUES.forEach((v) => {
+    (venues || VENUES).forEach((v) => {
       const r = ranks[v.id];
       const icon = r === 1 ? GOLD : r === 2 ? SILVER : r === 3 ? BRONZE : BLUE;
 
@@ -114,62 +145,48 @@ export default function MapView({ ranks = {} }: Props) {
         .on('tap', () => marker.fire('click'))
         .addTo(group);
 
-      // Double-click/tap to vote
+      // Click / double-click behavior. If in foodMode: single-click shows popup with name, avg price, walk time; double-click navigates to food vote with preselected venue.
+      const isFood = !!(propsRef.current?.foodMode);
       marker.on('dblclick', () => {
-        window.location.href = `/vote?venue=${encodeURIComponent(v.id)}`;
+        const dest = isFood ? `/food/vote?venue=${encodeURIComponent(v.id)}` : `/vote?venue=${encodeURIComponent(v.id)}`;
+        window.location.href = dest;
       });
       let lastTap = 0;
       marker.on('click', () => {
         const now = Date.now();
-        if (now - lastTap < 350) {
-          window.location.href = `/vote?venue=${encodeURIComponent(v.id)}`;
-        }
+        const wasDouble = now - lastTap < 350;
         lastTap = now;
+        if (wasDouble) {
+          const dest = isFood ? `/food/vote?venue=${encodeURIComponent(v.id)}` : `/vote?venue=${encodeURIComponent(v.id)}`;
+          window.location.href = dest;
+          return;
+        }
+
+        if (isFood) {
+          // Build popup content: name, avg price (if any), walking time from user
+          const talliesNow = propsRef.current?.tallies as Tallies | undefined;
+          const price = talliesNow?.[v.id]?.price ?? null;
+          const user = propsRef.current?.userLoc as { lat: number; lng: number } | null | undefined;
+          let walkText = '';
+          if (user && typeof user.lat === 'number' && typeof user.lng === 'number') {
+            const d = haversineMeters(user, { lat: v.lat, lng: v.lng });
+            const mins = Math.max(1, Math.round(d / 83.333)); // ~5 km/h (~3.1 mph) -> 83.333 m/min
+            walkText = `${mins} min walk`;
+          }
+          const priceText = typeof price === 'number' ? `Avg: £${Math.round(price)}` : '';
+          const parts = [escapeHtml(v.name), priceText, walkText].filter(Boolean);
+          const html = `<div style="min-width:140px">${parts.map(p => `<div>${escapeHtml(p)}</div>`).join('')}</div>`;
+          marker.bindPopup(html, { offset: [0, -10] }).openPopup();
+        } else {
+          // Non-food: no popup on single click (tooltip exists). Keep behavior as before.
+        }
       });
     });
-  }, [ranks]);
+  }, [ranks, venues, foodMode]);
 
-  // 3) Poll API for tonight's houseparties and draw markers
-  useEffect(() => {
-    const group = hpLayerRef.current;
-    if (!group) return;
+  
 
-    const load = async () => {
-      try {
-        const res = await fetch('/api/houseparty/tonight', { cache: 'no-store' });
-        if (!res.ok) throw new Error(await res.text());
-        const { items } = (await res.json()) as { items: any[] };
 
-        group.clearLayers();
-
-        items.forEach((hp) => {
-          if (!hp?.location?.lat || !hp?.location?.lng) return;
-
-          const m = L.marker([hp.location.lat, hp.location.lng], { icon: housepartyDivIcon(28) }).addTo(group);
-          m.setZIndexOffset(2000);
-          const html = `
-            <div style="color:#000;">
-              <strong>${escapeHtml(hp.name ?? 'Houseparty')}</strong><br/>
-              ${hp.kind ? `<em>${escapeHtml(hp.kind)}</em><br/>` : ''}
-              ${hp.address ? `${escapeHtml(hp.address)}<br/>` : ''}
-              ${hp.notes ? `<small>${escapeHtml(hp.notes)}</small>` : ''}
-            </div>
-          `;
-          m.bindPopup(html);
-        });
-      } catch (e) {
-        // fail silently (keeps map usable if offline)
-        console.warn('Failed to load houseparties', e);
-      }
-    };
-
-    load(); // initial
-    pollRef.current = setInterval(load, 20000); // every 20s
-
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, []);
 
   return (
     <>
@@ -187,10 +204,7 @@ export default function MapView({ ranks = {} }: Props) {
           <span className="inline-block h-3 w-3 rounded-full bg-blue-400" />
           Other places
         </span>
-        <span className="inline-flex items-center gap-1">
-          <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: '#F4C430', boxShadow: '0 0 6px rgba(255,215,0,.7)' }} />
-          Houseparty
-        </span>
+
       </div>
     </>
   );

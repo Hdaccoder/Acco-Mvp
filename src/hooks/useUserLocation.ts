@@ -5,22 +5,32 @@ export type UserLocation = { lat: number; lng: number; accuracy?: number } | nul
 
 
 export function useUserLocation() {
-const [loc, setLoc] = useState<UserLocation>(null);
-const [error, setError] = useState<string | null>(null);
+	const [loc, setLoc] = useState<UserLocation>(null);
+	const [error, setError] = useState<string | null>(null);
 
+	const doRequest = (opts?: PositionOptions) => {
+		if (!('geolocation' in navigator)) {
+			setError('Geolocation not supported');
+			return;
+		}
+		try {
+			navigator.geolocation.getCurrentPosition(
+				(pos) => {
+					setLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy });
+					setError(null);
+				},
+				(err) => setError(err?.message ?? String(err)),
+				{ enableHighAccuracy: false, maximumAge: 60000, timeout: 8000, ...(opts || {}) }
+			);
+		} catch (e) {
+			setError(String(e));
+		}
+	};
 
-useEffect(() => {
-if (!("geolocation" in navigator)) {
-setError("Geolocation not supported");
-return;
-}
-navigator.geolocation.getCurrentPosition(
-(pos) => setLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
-(err) => setError(err.message),
-{ enableHighAccuracy: false, maximumAge: 60000, timeout: 8000 }
-);
-}, []);
+	useEffect(() => {
+		doRequest();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
-
-return { loc, error };
+	return { loc, error, requestLocation: doRequest };
 }

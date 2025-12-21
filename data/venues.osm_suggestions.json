@@ -1,0 +1,181 @@
+{
+  "input": "data/venues.cleaned.csv",
+  "total": 45,
+  "matched": 28,
+  "suggestions": 1,
+  "details": [
+    {
+      "id": "blackpool-tower-area",
+      "match": "way/1137814212",
+      "distance": 399,
+      "score": "0.38"
+    },
+    {
+      "id": "popworld-blackpool",
+      "match": "way/1276575342",
+      "distance": 610,
+      "score": "0.35"
+    },
+    {
+      "id": "revolution-blackpool",
+      "match": "way/1276575342",
+      "distance": 672,
+      "score": "0.35"
+    },
+    {
+      "id": "tiki-bar-blackpool",
+      "match": "node/4502212007",
+      "distance": 120,
+      "score": "0.53"
+    },
+    {
+      "id": "walkabout-blackpool",
+      "match": "way/1134078930",
+      "distance": 368,
+      "score": "0.50"
+    },
+    {
+      "id": "cavern-club",
+      "match": "node/5612243075",
+      "distance": 316,
+      "score": "0.50"
+    },
+    {
+      "id": "concert-square",
+      "suggestion": "way/1104403277",
+      "distance": 6
+    },
+    {
+      "id": "heebie-jeebies",
+      "match": "way/1175740070",
+      "distance": 493,
+      "score": "0.85"
+    },
+    {
+      "id": "level-liverpool",
+      "match": "node/101433399",
+      "distance": 430,
+      "score": "0.50"
+    },
+    {
+      "id": "mccooleys-matthew-st",
+      "match": "way/1133250985",
+      "distance": 433,
+      "score": "0.50"
+    },
+    {
+      "id": "mojo-liverpool",
+      "match": "node/101433399",
+      "distance": 361,
+      "score": "0.50"
+    },
+    {
+      "id": "soho-liverpool",
+      "match": "node/101433399",
+      "distance": 379,
+      "score": "0.50"
+    },
+    {
+      "id": "the-merchant",
+      "match": "way/887649228",
+      "distance": 254,
+      "score": "0.85"
+    },
+    {
+      "id": "the-raz",
+      "match": "way/1060162573",
+      "distance": 194,
+      "score": "0.65"
+    },
+    {
+      "id": "albert-schloss",
+      "match": "node/5502942029",
+      "distance": 424,
+      "score": "0.85"
+    },
+    {
+      "id": "crazy-pedros",
+      "match": "node/4302638089",
+      "distance": 543,
+      "score": "0.70"
+    },
+    {
+      "id": "deansgate-locks",
+      "match": "node/2886288857",
+      "distance": 617,
+      "score": "0.35"
+    },
+    {
+      "id": "factory-mcr",
+      "match": "node/529051307",
+      "distance": 206,
+      "score": "0.38"
+    },
+    {
+      "id": "mojo-manchester",
+      "match": "node/1765136160",
+      "distance": 462,
+      "score": "0.50"
+    },
+    {
+      "id": "night-and-day",
+      "match": "node/3129220229",
+      "distance": 219,
+      "score": "0.62"
+    },
+    {
+      "id": "the-printworks",
+      "match": "node/12092188430",
+      "distance": 382,
+      "score": "0.38"
+    },
+    {
+      "id": "revs-de-cuba-mcr",
+      "match": "node/334648390",
+      "distance": 443,
+      "score": "0.50"
+    },
+    {
+      "id": "blues-kitchen-mcr",
+      "match": "node/13261369856",
+      "distance": 279,
+      "score": "0.50"
+    },
+    {
+      "id": "yes-manchester",
+      "match": "node/12092188430",
+      "distance": 314,
+      "score": "0.38"
+    },
+    {
+      "id": "preston-central",
+      "match": "way/81404517",
+      "distance": 768,
+      "score": "0.35"
+    },
+    {
+      "id": "switch-preston",
+      "match": "way/81404517",
+      "distance": 345,
+      "score": "0.50"
+    },
+    {
+      "id": "the-ferret",
+      "match": "way/101318338",
+      "distance": 84,
+      "score": "1.00"
+    },
+    {
+      "id": "vinyl-tap-preston",
+      "match": "node/4720379832",
+      "distance": 36,
+      "score": "1.00"
+    },
+    {
+      "id": "warehouse-preston",
+      "match": "way/81404517",
+      "distance": 395,
+      "score": "0.50"
+    }
+  ]
+}

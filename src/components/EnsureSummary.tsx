@@ -26,15 +26,21 @@ export default function EnsureSummary() {
         if (cancelled) return;
 
         if (!snap.exists()) {
-          await setDoc(ref, {
-            date: nk,
-            version: 1,
-            createdAt: serverTimestamp(),
-            computedAt: serverTimestamp(),
-            predictions: [], // You can fill this later from a job/Cloud Function.
-            ready: true,
-            source: "ensure-summary@client",
-          });
+          // Try to trigger server-side generation first
+          try {
+            await fetch('/api/ensure-summary/trigger', { method: 'POST' });
+          } catch {
+            // best-effort fallback: create a placeholder so clients don't loop
+            await setDoc(ref, {
+              date: nk,
+              version: 1,
+              createdAt: serverTimestamp(),
+              computedAt: serverTimestamp(),
+              predictions: [],
+              ready: false,
+              source: 'ensure-summary@client',
+            });
+          }
         }
       } catch {
         // Swallow; this is best-effort and safe to ignore.

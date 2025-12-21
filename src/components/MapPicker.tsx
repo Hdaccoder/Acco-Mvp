@@ -1,10 +1,16 @@
-'use client';
+"use client";
 
 import { useEffect, useRef } from 'react';
-import L, { Map as LeafletMap, Marker as LeafletMarker } from 'leaflet';
-import { housepartyDivIcon } from '@/lib/housepartyMarker';
 
-import 'leaflet/dist/leaflet.css';
+
+// Inject Leaflet CSS at runtime to avoid PostCSS processing of node_modules CSS
+if (typeof document !== 'undefined' && !document.querySelector('link[data-leaflet-css]')) {
+  const link = document.createElement('link');
+  link.setAttribute('rel', 'stylesheet');
+  link.setAttribute('href', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
+  link.setAttribute('data-leaflet-css', '1');
+  document.head.appendChild(link);
+}
 
 type Props = {
   value?: { lat: number; lng: number } | null;
@@ -15,19 +21,10 @@ type Props = {
 
 export default function MapPicker({ value, onChange, className, height = 280 }: Props) {
   const mapEl = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<LeafletMap | null>(null);
-  const markerRef = useRef<LeafletMarker | null>(null);
+  const mapRef = useRef<any | null>(null);
+  const markerRef = useRef<any | null>(null);
 
-  // Use Leaflet's default marker (CDN paths avoid bundler issues)
-  // Do this once at module scope or inside first effect before creating markers.
-  L.Icon.Default.mergeOptions({
-    iconRetinaUrl:
-      'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-    iconUrl:
-      'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-    shadowUrl:
-      'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  });
+  // Leaflet is dynamically imported on the client to avoid server-side evaluation
 
   // Initialize map once
   useEffect(() => {
@@ -35,41 +32,52 @@ export default function MapPicker({ value, onChange, className, height = 280 }: 
 
     const initial = value ?? { lat: 53.569, lng: -2.881 }; // Ormskirk default
 
-    const map = L.map(mapEl.current, {
-      center: initial,
-      zoom: 15,
-      zoomControl: true,
-      attributionControl: true,
-    });
-    mapRef.current = map;
+    (async () => {
+      const leaflet: any = await import('leaflet');
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors',
-      maxZoom: 19,
-    }).addTo(map);
+      // Use Leaflet's default marker with CDN image paths
+      leaflet.Icon.Default.mergeOptions({
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      });
 
-    // Default Leaflet marker (draggable)
-    const marker = L.marker(initial, { draggable: true, icon: housepartyDivIcon(34) }).addTo(map);
-    marker.setZIndexOffset(2000); // keep above tiles/controls
-    markerRef.current = marker;
+      const map = leaflet.map(mapEl.current, {
+        center: initial,
+        zoom: 15,
+        zoomControl: true,
+        attributionControl: true,
+      });
+      mapRef.current = map;
 
-    const commit = (latlng: L.LatLng) => onChange({ lat: latlng.lat, lng: latlng.lng });
+      leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19,
+      }).addTo(map);
 
-    marker.on('dragend', () => commit(marker.getLatLng()));
-    map.on('click', (e: L.LeafletMouseEvent) => {
-      marker.setLatLng(e.latlng);
-      commit(e.latlng);
-    });
+      // Default Leaflet marker (draggable)
+      const marker = leaflet.marker(initial, { draggable: true }).addTo(map);
+      marker.setZIndexOffset(2000); // keep above tiles/controls
+      markerRef.current = marker;
+
+      const commit = (latlng: any) => onChange({ lat: latlng.lat, lng: latlng.lng });
+
+      marker.on('dragend', () => commit(marker.getLatLng()));
+      map.on('click', (e: any) => {
+        marker.setLatLng(e.latlng);
+        commit(e.latlng);
+      });
+    })();
 
     // Ensure proper sizing after mount
-    const invalidate = () => { try { map.invalidateSize(); } catch {} };
-    map.whenReady(invalidate);
+    const invalidate = () => { try { mapRef.current?.invalidateSize(); } catch {} };
+    mapRef.current?.whenReady?.(invalidate);
     setTimeout(invalidate, 100);
     setTimeout(invalidate, 300);
 
     // Cleanup on unmount
     return () => {
-      try { map.remove(); } catch {}
+      try { mapRef.current?.remove(); } catch {}
       mapRef.current = null;
       markerRef.current = null;
     };

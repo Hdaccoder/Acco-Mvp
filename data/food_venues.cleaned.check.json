@@ -1,0 +1,6 @@
+{
+  "input": "data/food_venues.cleaned.csv",
+  "total": 65,
+  "flagged": 0,
+  "details": []
+}

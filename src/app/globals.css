@@ -39,34 +39,4 @@ button:focus {
   box-shadow: 0 0 0 2px rgba(255,255,255,0.75);
 }
 
-/* Glow pulse for houseparty icons */
-.leaflet-marker-icon.drop-shadow-md {
-  animation: glowPulse 2.5s infinite ease-in-out;
-}
 
-@keyframes glowPulse {
-  0%, 100% {
-    filter: drop-shadow(0 0 6px rgba(255, 215, 0, 0.6));
-    transform: scale(1);
-  }
-  50% {
-    filter: drop-shadow(0 0 14px rgba(255, 215, 0, 1));
-    transform: scale(1.08);
-  }
-}
-.acc-house-icon {
-  filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.75));
-}
-
-/* Houseparty pin (DivIcon) – keep the tip fixed on the location */
-.hp-pin {
-  transform-origin: center bottom;           /* critical: no drift */
-  filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.65));
-  /* no scale animation; just glow so we don't move the anchor */
-}
-
-.hp-pin img {
-  display: block;
-  width: 100%;
-  height: 100%;
-}

@@ -1,0 +1,328 @@
+{
+  "input": "data/food_venues.cleaned.csv",
+  "total": 65,
+  "matched": 50,
+  "suggestions": 4,
+  "details": [
+    {
+      "id": "five-guys-blackpool",
+      "suggestion": "way/1137814195",
+      "distance": 9
+    },
+    {
+      "id": "franco-manca-blackpool",
+      "suggestion": "way/1137814195",
+      "distance": 9
+    },
+    {
+      "id": "mcdonalds-blackpool-tower",
+      "match": "node/11367382632",
+      "distance": 124,
+      "score": "0.65"
+    },
+    {
+      "id": "nandos-blackpool",
+      "match": "way/146608587",
+      "distance": 147,
+      "score": "0.77"
+    },
+    {
+      "id": "pizzaexpress-blackpool",
+      "match": "way/1276575342",
+      "distance": 618,
+      "score": "0.35"
+    },
+    {
+      "id": "fish-chips-blackpool",
+      "match": "way/1225095971",
+      "distance": 414,
+      "score": "0.50"
+    },
+    {
+      "id": "turtle-bay-blackpool",
+      "match": "node/11901080723",
+      "distance": 186,
+      "score": "0.77"
+    },
+    {
+      "id": "wagamama-blackpool",
+      "match": "way/1276575342",
+      "distance": 678,
+      "score": "0.35"
+    },
+    {
+      "id": "five-guys-chester",
+      "match": "node/6403547770",
+      "distance": 392,
+      "score": "0.62"
+    },
+    {
+      "id": "nandos-chester",
+      "match": "node/6403547764",
+      "distance": 382,
+      "score": "0.62"
+    },
+    {
+      "id": "pizzaexpress-chester",
+      "match": "node/4338828904",
+      "distance": 477,
+      "score": "0.50"
+    },
+    {
+      "id": "turtle-bay-chester",
+      "match": "node/12310440545",
+      "distance": 18,
+      "score": "0.77"
+    },
+    {
+      "id": "wagamama-chester",
+      "match": "node/5196239980",
+      "distance": 427,
+      "score": "0.50"
+    },
+    {
+      "id": "bold-street-coffee",
+      "match": "node/2803537075",
+      "distance": 471,
+      "score": "0.85"
+    },
+    {
+      "id": "cote-liverpool",
+      "match": "way/1172189734",
+      "distance": 250,
+      "score": "0.67"
+    },
+    {
+      "id": "dishoom-liverpool",
+      "match": "node/101433399",
+      "distance": 385,
+      "score": "0.50"
+    },
+    {
+      "id": "five-guys-liverpool",
+      "match": "node/703369224",
+      "distance": 170,
+      "score": "0.65"
+    },
+    {
+      "id": "franco-manca-liverpool",
+      "match": "node/12398773101",
+      "distance": 494,
+      "score": "0.38"
+    },
+    {
+      "id": "maray-liverpool",
+      "match": "node/101433399",
+      "distance": 449,
+      "score": "0.50"
+    },
+    {
+      "id": "mowgli-liverpool",
+      "match": "node/4339439315",
+      "distance": 491,
+      "score": "0.67"
+    },
+    {
+      "id": "nandos-liverpool-one",
+      "match": "node/880357415",
+      "distance": 141,
+      "score": "0.65"
+    },
+    {
+      "id": "pho-liverpool",
+      "match": "node/101433399",
+      "distance": 452,
+      "score": "0.50"
+    },
+    {
+      "id": "ruffle-restaurant",
+      "match": "node/880357405",
+      "distance": 118,
+      "score": "0.53"
+    },
+    {
+      "id": "turtle-bay-liverpool",
+      "match": "node/4501136338",
+      "distance": 129,
+      "score": "0.77"
+    },
+    {
+      "id": "wagamama-liverpool",
+      "match": "node/101433399",
+      "distance": 485,
+      "score": "0.38"
+    },
+    {
+      "id": "bundobust-manchester",
+      "match": "node/9063279210",
+      "distance": 382,
+      "score": "0.50"
+    },
+    {
+      "id": "cote-manchester",
+      "match": "node/4302831068",
+      "distance": 185,
+      "score": "0.82"
+    },
+    {
+      "id": "dishoom-manchester",
+      "match": "node/1765136160",
+      "distance": 403,
+      "score": "0.50"
+    },
+    {
+      "id": "five-guys-manchester",
+      "match": "node/9621341967",
+      "distance": 292,
+      "score": "0.62"
+    },
+    {
+      "id": "hawksmoor-manchester",
+      "match": "node/9063279210",
+      "distance": 197,
+      "score": "0.65"
+    },
+    {
+      "id": "mowgli-manchester",
+      "match": "node/4580387944",
+      "distance": 490,
+      "score": "0.67"
+    },
+    {
+      "id": "nandos-deansgate",
+      "match": "node/331488417",
+      "distance": 197,
+      "score": "0.77"
+    },
+    {
+      "id": "pho-manchester",
+      "match": "node/2692887724",
+      "distance": 496,
+      "score": "0.50"
+    },
+    {
+      "id": "rudys-manchester",
+      "match": "node/2742190226",
+      "distance": 465,
+      "score": "0.67"
+    },
+    {
+      "id": "tattu-manchester",
+      "match": "node/5647487982",
+      "distance": 384,
+      "score": "0.50"
+    },
+    {
+      "id": "turtle-bay-manchester",
+      "match": "node/998382550",
+      "distance": 465,
+      "score": "0.62"
+    },
+    {
+      "id": "wagamama-manchester",
+      "match": "node/2683693095",
+      "distance": 307,
+      "score": "0.50"
+    },
+    {
+      "id": "cosmo-preston",
+      "suggestion": "node/40951424",
+      "distance": 12
+    },
+    {
+      "id": "cote-preston",
+      "suggestion": "node/5169707748",
+      "distance": 16
+    },
+    {
+      "id": "five-guys-preston",
+      "match": "way/180469063",
+      "distance": 2230,
+      "score": "0.47"
+    },
+    {
+      "id": "franco-manca-preston",
+      "match": "way/81404517",
+      "distance": 353,
+      "score": "0.38"
+    },
+    {
+      "id": "mowgli-preston",
+      "match": "node/5169371354",
+      "distance": 65,
+      "score": "0.44"
+    },
+    {
+      "id": "nandos-preston",
+      "match": "node/11948944275",
+      "distance": 369,
+      "score": "0.62"
+    },
+    {
+      "id": "turtle-bay-preston",
+      "match": "node/4407506899",
+      "distance": 329,
+      "score": "0.62"
+    },
+    {
+      "id": "wagamama-preston",
+      "match": "node/12857547366",
+      "distance": 329,
+      "score": "0.50"
+    },
+    {
+      "id": "five-guys-southport",
+      "match": "node/3793945338",
+      "distance": 279,
+      "score": "0.38"
+    },
+    {
+      "id": "mcdonalds-southport",
+      "match": "node/526924406",
+      "distance": 31,
+      "score": "0.53"
+    },
+    {
+      "id": "nandos-southport",
+      "match": "node/526924406",
+      "distance": 111,
+      "score": "0.53"
+    },
+    {
+      "id": "wagamama-southport",
+      "match": "node/3793945338",
+      "distance": 287,
+      "score": "0.38"
+    },
+    {
+      "id": "five-guys-warrington",
+      "match": "node/12866297686",
+      "distance": 413,
+      "score": "0.38"
+    },
+    {
+      "id": "mcdonalds-warrington",
+      "match": "way/972915908",
+      "distance": 482,
+      "score": "0.62"
+    },
+    {
+      "id": "nandos-warrington",
+      "match": "way/972674217",
+      "distance": 228,
+      "score": "0.62"
+    },
+    {
+      "id": "turtle-bay-warrington",
+      "match": "node/12866297686",
+      "distance": 382,
+      "score": "0.38"
+    },
+    {
+      "id": "wagamama-warrington",
+      "match": "node/12866297686",
+      "distance": 455,
+      "score": "0.50"
+    }
+  ]
+}

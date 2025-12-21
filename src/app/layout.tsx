@@ -1,12 +1,16 @@
 // src/app/layout.tsx
 import "./globals.css";
 import Link from "next/link";
+import FoodNightlifeToggle from "@/components/FoodNightlifeToggle";
+import NavLinks from "@/components/NavLinks";
+import TopBrandLink from "@/components/TopBrandLink";
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/react";
 import Script from "next/script";
 
 export const metadata: Metadata = {
   title: "Acco — Tonight in Ormskirk",
+  // keep generic metadata title; the page itself will display the user's city where available
   description: "See which bars & clubs are hot tonight based on real votes.",
   manifest: "/manifest.webmanifest",
   icons: {
@@ -22,8 +26,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   // ---- AdSense config via envs ----
-  const ADS_PUB =
-    process.env.NEXT_PUBLIC_ADSENSE_PUB ?? "ca-pub-0000000000000000"; // fallback
+  const ADS_PUB = process.env.NEXT_PUBLIC_ADSENSE_PUB ?? "";
   const LEFT_SLOT = process.env.NEXT_PUBLIC_ADSENSE_LEFT_SLOT ?? "";
   const RIGHT_SLOT = process.env.NEXT_PUBLIC_ADSENSE_RIGHT_SLOT ?? "";
 
@@ -52,7 +55,7 @@ export default function RootLayout({
     <html lang="en">
       <head>
         {/* --- Google AdSense loader (site-wide) --- */}
-        {ADS_PUB && (
+        {ADS_PUB && ADS_PUB !== 'ca-pub-0000000000000000' && (
           <Script
             id="adsbygoogle-loader"
             src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADS_PUB}`}
@@ -67,41 +70,12 @@ export default function RootLayout({
         {/* Top nav */}
         <header className="sticky top-0 z-20 backdrop-blur bg-neutral-950/70 border-b border-neutral-900">
           <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-            <Link href="/" className="font-semibold tracking-tight">
-              Acco
-            </Link>
+            {/* Client component decides whether to link to / or /food based on path */}
+            <TopBrandLink />
 
             <nav className="flex items-center gap-4 text-sm text-neutral-300">
-              <Link href="/predictions" className="hover:text-white">
-                Predictions
-              </Link>
-
-              <Link
-                href="/vote"
-                className="hover:text-black hover:bg-yellow-400/90 border border-yellow-400 text-yellow-300 rounded-lg px-3 py-1"
-              >
-                Vote
-              </Link>
-              
-              <Link
-                href="/houseparties"
-                className="hover:text-white"
-              >
-                Houseparties
-              </Link>
-
-              
-
-              <Link href="/privacy" className="hover:text-white hidden sm:inline">
-                Privacy
-              </Link>
-              <Link href="/terms" className="hover:text-white hidden sm:inline">
-                Terms
-              </Link>
-
-              <a href={issuesHref} className="hover:text-white">
-                Issues?
-              </a>
+              <FoodNightlifeToggle />
+              <NavLinks issuesHref={issuesHref} />
             </nav>
           </div>
         </header>
@@ -122,7 +96,7 @@ export default function RootLayout({
               />
               {/* AdSense needs a push() after the ins appears */}
               <Script id="ads-left-push" strategy="afterInteractive">
-                {`(window.adsbygoogle = window.adsbygoogle || []).push({});`}
+                {`(function(){try{const el=document.querySelector('ins[data-ad-slot="${LEFT_SLOT}"]'); if(el && el.clientWidth>0){(window.adsbygoogle=window.adsbygoogle||[]).push({});}}catch(e){/* ignore */}})();`}
               </Script>
             </aside>
 
@@ -137,7 +111,7 @@ export default function RootLayout({
                 data-full-width-responsive="false"
               />
               <Script id="ads-right-push" strategy="afterInteractive">
-                {`(window.adsbygoogle = window.adsbygoogle || []).push({});`}
+                {`(function(){try{const el=document.querySelector('ins[data-ad-slot="${RIGHT_SLOT}"]'); if(el && el.clientWidth>0){(window.adsbygoogle=window.adsbygoogle||[]).push({});}}catch(e){/* ignore */}})();`}
               </Script>
             </aside>
           </>
@@ -151,12 +125,7 @@ export default function RootLayout({
           <div className="max-w-3xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
             <span>© {new Date().getFullYear()} Paul In Power</span>
             <div className="flex items-center gap-4">
-              <Link href="/privacy" className="hover:text-white sm:hidden">
-                Privacy
-              </Link>
-              <Link href="/terms" className="hover:text-white sm:hidden">
-                Terms
-              </Link>
+
               <a href={issuesHref} className="hover:text-white">
                 Report an issue
               </a>
@@ -164,7 +133,11 @@ export default function RootLayout({
           </div>
         </footer>
 
-        {/* Vercel analytics (unchanged) */}
+        {/* In development, unregister any previously-registered service workers so cached CSS doesn't persist. */}
+        <Script id="dev-unregister-sw" strategy="afterInteractive">
+          {`(function(){try{if(location.hostname==='localhost'||location.hostname==='127.0.0.1'){navigator.serviceWorker.getRegistrations().then(r=>r.forEach(reg=>reg.unregister())).then(()=>{console.log('dev: unregistered service workers');try{var links=document.querySelectorAll('link[rel=stylesheet]');links.forEach(l=>{var href=l.href; if(href && href.indexOf('?_sw')===-1){l.href=href+ (href.indexOf('?')===-1? '?_sw=' : '&_sw=') + Date.now();}});}catch(e){}});}}catch(e){/* ignore */}})()`}
+        </Script>
+
         <Analytics />
       </body>
     </html>

@@ -1,0 +1,66 @@
+id,name,lat,lng,baseline,city,osm_id,osm_name,osm_lat,osm_lng,osm_distance_m,match_confidence
+saffron,Saffron,53.56676,-2.88288,5,Ormskirk,,,,,,
+piri-piri-grill-ormskirk,Piri Piri Grill Ormskirk,53.56750,-2.88349,4,Ormskirk,,,,,,
+scoozi-pizza-pasta-ormskirk,Scoozi Pizza & Pasta Ormskirk,53.56740,-2.88355,5,Ormskirk,,,,,,
+mcdonalds-ormskirk,McDonald's (Ormskirk),53.56764,-2.88666,6,Ormskirk,,,,,,
+babaz-burgerz,Babaz Burgerz,53.56672,-2.88469,6,Ormskirk,,,,,,
+wans-chinese-takeaway,Wan's Chinese Takeaway,53.56680,-2.88496,5,Ormskirk,,,,,,
+istanbul-grill-ormskirk,Istanbul Grill Ormskirk,53.5681,-2.8856,5,Ormskirk,,,,,,
+marmaris,Marmaris Pizza & Kebab House,53.56668,-2.88309,5,Ormskirk,,,,,,
+wetherspoons-ormskirk,Wetherspoons (Court Leet),53.56804,-2.88494,6,Ormskirk,,,,,,
+acropolis-ormskirk,Acropolis,53.56579,-2.88761,6,Ormskirk,,,,,,
+barries-place,Barrie's Place,53.56783,-2.88579,6,Ormskirk,,,,,,
+five-guys-blackpool,Five Guys (Blackpool),53.8166,-3.0549,7,Blackpool,way/1137814195,Yoochat,53.816637,-3.0547794,9,suggestion
+franco-manca-blackpool,Franco Manca (Blackpool),53.8167,-3.0547,6,Blackpool,way/1137814195,Yoochat,53.816637,-3.0547794,9,suggestion
+mcdonalds-blackpool-tower,McDonald's (Tower Area),53.8158,-3.0539,6,Blackpool,node/11367382632,McDonald's,53.8146936,-3.0540695,124,0.65
+nandos-blackpool,Nando's (Blackpool),53.8162,-3.0552,7,Blackpool,way/146608587,Nando's,53.8172325,-3.0538083,147,0.77
+pizzaexpress-blackpool,PizzaExpress (Blackpool),53.8161,-3.0546,6,Blackpool,way/1276575342,Ballers Blackpool,53.8110772,-3.0505749,618,0.35
+fish-chips-blackpool,Seafront Fish & Chips (Central),53.8160,-3.0550,7,Blackpool,way/1225095971,Traditional Fish and Chips,53.8122777,-3.0548441,414,0.50
+turtle-bay-blackpool,Turtle Bay (Blackpool),53.8168,-3.0558,7,Blackpool,node/11901080723,Turtle Bay,53.8184744,-3.0557569,186,0.77
+wagamama-blackpool,Wagamama (Blackpool),53.8164,-3.0556,7,Blackpool,way/1276575342,Ballers Blackpool,53.8110772,-3.0505749,678,0.35
+five-guys-chester,Five Guys (Chester),53.1924,-2.8930,7,Chester,node/6403547770,Five Guys,53.1890192,-2.8913233,392,0.62
+nandos-chester,Nando's (Chester),53.1920,-2.8932,7,Chester,node/6403547764,Nando's,53.1888447,-2.8909371,382,0.62
+pizzaexpress-chester,PizzaExpress (Chester),53.1926,-2.8934,6,Chester,node/4338828904,PizzaExpress,53.1900341,-2.8876703,477,0.50
+turtle-bay-chester,Turtle Bay (Chester),53.1918,-2.8938,7,Chester,node/12310440545,Turtle Bay,53.1919585,-2.8937334,18,0.77
+wagamama-chester,Wagamama (Chester),53.1922,-2.8926,7,Chester,node/5196239980,Picolino Chester,53.1889473,-2.8892046,427,0.50
+bold-street-coffee,Bold Street Coffee,53.4023,-2.9839,7,Liverpool,node/2803537075,Bold Street Coffee,53.4024714,-2.9768068,471,0.85
+cote-liverpool,Côte Brasserie (Liverpool),53.4049,-2.9840,7,Liverpool,way/1172189734,Côte Brasserie,53.4029099,-2.9857617,250,0.67
+dishoom-liverpool,Dishoom (Liverpool),53.4048,-2.9858,8,Liverpool,node/101433399,The Liverpool,53.4049673,-2.9916084,385,0.50
+five-guys-liverpool,Five Guys (Liverpool ONE),53.4046,-2.9849,7,Liverpool,node/703369224,Five Guys,53.4040507,-2.987294,170,0.65
+franco-manca-liverpool,Franco Manca (Liverpool),53.4040,-2.9842,7,Liverpool,node/12398773101,Pixel Bar Liverpool,53.4021924,-2.9773925,494,0.38
+maray-liverpool,Maray (Liverpool),53.4030,-2.9857,7,Liverpool,node/101433399,The Liverpool,53.4049673,-2.9916084,449,0.50
+mowgli-liverpool,Mowgli Street Food (Liverpool),53.4025,-2.9849,8,Liverpool,node/4339439315,Mowgli Street Food,53.4028306,-2.9775123,491,0.67
+nandos-liverpool-one,Nando's (Liverpool ONE),53.4043,-2.9845,7,Liverpool,node/880357415,Nando's,53.4041799,-2.9866178,141,0.65
+pho-liverpool,Pho (Liverpool),53.4047,-2.9848,7,Liverpool,node/101433399,The Liverpool,53.4049673,-2.9916084,452,0.50
+ruffle-restaurant,Ruffle Bar & Kitchen,53.4041,-2.9856,7,Liverpool,node/880357405,Gourmet Burger Kitchen,53.4041323,-2.9873851,118,0.53
+turtle-bay-liverpool,Turtle Bay (Liverpool),53.4039,-2.9851,7,Liverpool,node/4501136338,Turtle Bay,53.403905,-2.9831547,129,0.77
+wagamama-liverpool,Wagamama (Liverpool ONE),53.4049,-2.9843,7,Liverpool,node/101433399,The Liverpool,53.4049673,-2.9916084,485,0.38
+bundobust-manchester,Bundobust (Manchester),53.4831,-2.2433,8,Manchester,node/9063279210,Panacea Manchester,53.4804972,-2.2470756,382,0.50
+cote-manchester,Côte Brasserie (Manchester),53.4816,-2.2451,7,Manchester,node/4302831068,Côte Brasserie,53.482232,-2.2476936,185,0.82
+dishoom-manchester,Dishoom (Manchester),53.4810,-2.2435,8,Manchester,node/1765136160,BrewDog Manchester,53.4781428,-2.2472464,403,0.50
+five-guys-manchester,Five Guys (Manchester),53.4820,-2.2414,7,Manchester,node/9621341967,Five Guys,53.4816111,-2.237029,292,0.62
+hawksmoor-manchester,Hawksmoor (Manchester),53.4804,-2.2441,8,Manchester,node/9063279210,Panacea Manchester,53.4804972,-2.2470756,197,0.65
+mowgli-manchester,Mowgli Street Food (Manchester),53.4817,-2.2387,8,Manchester,node/4580387944,Mowgli Street Food,53.4851119,-2.2433919,490,0.67
+nandos-deansgate,Nando's (Deansgate),53.4786,-2.2473,7,Manchester,node/331488417,Nando's,53.4791775,-2.2501179,197,0.77
+pho-manchester,Pho (Manchester),53.4830,-2.2440,7,Manchester,node/2692887724,Pho,53.4791844,-2.2401083,496,0.50
+rudys-manchester,Rudy's Pizza (Manchester),53.4822,-2.2427,8,Manchester,node/2742190226,Rudy's Pizza Napoletana,53.4791959,-2.2378012,465,0.67
+tattu-manchester,Tattu (Manchester),53.4826,-2.2456,8,Manchester,node/5647487982,Manchester House,53.4810915,-2.2508128,384,0.50
+turtle-bay-manchester,Turtle Bay (Manchester),53.4808,-2.2430,7,Manchester,node/998382550,Turtle Bay,53.4766181,-2.2426784,465,0.62
+wagamama-manchester,Wagamama (Manchester),53.4825,-2.2406,7,Manchester,node/2683693095,Wagamama,53.4851597,-2.241827,307,0.50
+cosmo-preston,COSMO World Buffet (Preston),53.7600,-2.7032,7,Preston,node/40951424,Old Black Bull,53.7601101,-2.7032353,12,suggestion
+cote-preston,Côte Brasserie (Preston),53.7599,-2.7046,7,Preston,node/5169707748,Tino's,53.760006,-2.7044445,16,suggestion
+five-guys-preston,Five Guys (Preston),53.7602,-2.7040,7,Preston,way/180469063,Five Guys,53.7730376,-2.6779251,2230,0.47
+franco-manca-preston,Franco Manca (Preston),53.7595,-2.7037,7,Preston,way/81404517,Trinity Preston,53.7563482,-2.7030788,353,0.38
+mowgli-preston,Mowgli Street Food (Preston),53.7594,-2.7041,7,Preston,node/5169371354,Lune Street Fish and Chips,53.7592101,-2.7031608,65,0.44
+nandos-preston,Nando's (Preston),53.7597,-2.7050,7,Preston,node/11948944275,Nando's,53.7589329,-2.6995421,369,0.62
+turtle-bay-preston,Turtle Bay (Preston),53.7598,-2.7036,7,Preston,node/4407506899,Turtle Bay,53.7585703,-2.6990411,329,0.62
+wagamama-preston,Wagamama (Preston),53.7596,-2.7042,7,Preston,node/12857547366,Wagamama,53.7608403,-2.6996489,329,0.50
+five-guys-southport,Five Guys (Southport),53.6469,-3.0071,7,Southport,node/3793945338,Southport Food Centre,53.6492266,-3.0054983,279,0.38
+mcdonalds-southport,McDonald's (Southport),53.6475,-3.0080,6,Southport,node/526924406,Maloney's Bar,53.6474931,-3.0075373,31,0.53
+nandos-southport,Nando's (Southport),53.6466,-3.0068,7,Southport,node/526924406,Maloney's Bar,53.6474931,-3.0075373,111,0.53
+wagamama-southport,Wagamama (Southport),53.6467,-3.0064,7,Southport,node/3793945338,Southport Food Centre,53.6492266,-3.0054983,287,0.38
+five-guys-warrington,Five Guys (Warrington),53.3913,-2.5960,7,Warrington,node/12866297686,Patina Warrington,53.3879071,-2.5985453,413,0.38
+mcdonalds-warrington,McDonald's (Warrington),53.3920,-2.5978,6,Warrington,way/972915908,McDonald's,53.3884956,-2.5935273,482,0.62
+nandos-warrington,Nando's (Warrington),53.3910,-2.5964,7,Warrington,way/972674217,Nando's,53.3894937,-2.5940592,228,0.62
+turtle-bay-warrington,Turtle Bay (Warrington),53.3912,-2.5969,7,Warrington,node/12866297686,Patina Warrington,53.3879071,-2.5985453,382,0.38
+wagamama-warrington,Wagamama (Warrington),53.3916,-2.5956,7,Warrington,node/12866297686,Patina Warrington,53.3879071,-2.5985453,455,0.50

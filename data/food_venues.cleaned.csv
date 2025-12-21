@@ -1,0 +1,66 @@
+id,name,lat,lng,baseline,city
+saffron,Saffron,53.56676,-2.88288,5,Ormskirk
+piri-piri-grill-ormskirk,Piri Piri Grill Ormskirk,53.56750,-2.88349,4,Ormskirk
+scoozi-pizza-pasta-ormskirk,Scoozi Pizza & Pasta Ormskirk,53.56740,-2.88355,5,Ormskirk
+mcdonalds-ormskirk,McDonald's (Ormskirk),53.56764,-2.88666,6,Ormskirk
+babaz-burgerz,Babaz Burgerz,53.56672,-2.88469,6,Ormskirk
+wans-chinese-takeaway,Wan's Chinese Takeaway,53.56680,-2.88496,5,Ormskirk
+istanbul-grill-ormskirk,Istanbul Grill Ormskirk,53.5681,-2.8856,5,Ormskirk
+marmaris,Marmaris Pizza & Kebab House,53.56668,-2.88309,5,Ormskirk
+wetherspoons-ormskirk,Wetherspoons (Court Leet),53.56804,-2.88494,6,Ormskirk
+acropolis-ormskirk,Acropolis,53.56579,-2.88761,6,Ormskirk
+barries-place,Barrie's Place,53.56783,-2.88579,6,Ormskirk
+five-guys-blackpool,Five Guys (Blackpool),53.8166,-3.0549,7,Blackpool
+franco-manca-blackpool,Franco Manca (Blackpool),53.8167,-3.0547,6,Blackpool
+mcdonalds-blackpool-tower,McDonald's (Tower Area),53.8158,-3.0539,6,Blackpool
+nandos-blackpool,Nando's (Blackpool),53.8162,-3.0552,7,Blackpool
+pizzaexpress-blackpool,PizzaExpress (Blackpool),53.8161,-3.0546,6,Blackpool
+fish-chips-blackpool,Seafront Fish & Chips (Central),53.8160,-3.0550,7,Blackpool
+turtle-bay-blackpool,Turtle Bay (Blackpool),53.8168,-3.0558,7,Blackpool
+wagamama-blackpool,Wagamama (Blackpool),53.8164,-3.0556,7,Blackpool
+five-guys-chester,Five Guys (Chester),53.1924,-2.8930,7,Chester
+nandos-chester,Nando's (Chester),53.1920,-2.8932,7,Chester
+pizzaexpress-chester,PizzaExpress (Chester),53.1926,-2.8934,6,Chester
+turtle-bay-chester,Turtle Bay (Chester),53.1918,-2.8938,7,Chester
+wagamama-chester,Wagamama (Chester),53.1922,-2.8926,7,Chester
+bold-street-coffee,Bold Street Coffee,53.4023,-2.9839,7,Liverpool
+cote-liverpool,Côte Brasserie (Liverpool),53.4049,-2.9840,7,Liverpool
+dishoom-liverpool,Dishoom (Liverpool),53.4048,-2.9858,8,Liverpool
+five-guys-liverpool,Five Guys (Liverpool ONE),53.4046,-2.9849,7,Liverpool
+franco-manca-liverpool,Franco Manca (Liverpool),53.4040,-2.9842,7,Liverpool
+maray-liverpool,Maray (Liverpool),53.4030,-2.9857,7,Liverpool
+mowgli-liverpool,Mowgli Street Food (Liverpool),53.4025,-2.9849,8,Liverpool
+nandos-liverpool-one,Nando's (Liverpool ONE),53.4043,-2.9845,7,Liverpool
+pho-liverpool,Pho (Liverpool),53.4047,-2.9848,7,Liverpool
+ruffle-restaurant,Ruffle Bar & Kitchen,53.4041,-2.9856,7,Liverpool
+turtle-bay-liverpool,Turtle Bay (Liverpool),53.4039,-2.9851,7,Liverpool
+wagamama-liverpool,Wagamama (Liverpool ONE),53.4049,-2.9843,7,Liverpool
+bundobust-manchester,Bundobust (Manchester),53.4831,-2.2433,8,Manchester
+cote-manchester,Côte Brasserie (Manchester),53.4816,-2.2451,7,Manchester
+dishoom-manchester,Dishoom (Manchester),53.4810,-2.2435,8,Manchester
+five-guys-manchester,Five Guys (Manchester),53.4820,-2.2414,7,Manchester
+hawksmoor-manchester,Hawksmoor (Manchester),53.4804,-2.2441,8,Manchester
+mowgli-manchester,Mowgli Street Food (Manchester),53.4817,-2.2387,8,Manchester
+nandos-deansgate,Nando's (Deansgate),53.4786,-2.2473,7,Manchester
+pho-manchester,Pho (Manchester),53.4830,-2.2440,7,Manchester
+rudys-manchester,Rudy's Pizza (Manchester),53.4822,-2.2427,8,Manchester
+tattu-manchester,Tattu (Manchester),53.4826,-2.2456,8,Manchester
+turtle-bay-manchester,Turtle Bay (Manchester),53.4808,-2.2430,7,Manchester
+wagamama-manchester,Wagamama (Manchester),53.4825,-2.2406,7,Manchester
+cosmo-preston,COSMO World Buffet (Preston),53.7600,-2.7032,7,Preston
+cote-preston,Côte Brasserie (Preston),53.7599,-2.7046,7,Preston
+five-guys-preston,Five Guys (Preston),53.7602,-2.7040,7,Preston
+franco-manca-preston,Franco Manca (Preston),53.7595,-2.7037,7,Preston
+mowgli-preston,Mowgli Street Food (Preston),53.7594,-2.7041,7,Preston
+nandos-preston,Nando's (Preston),53.7597,-2.7050,7,Preston
+turtle-bay-preston,Turtle Bay (Preston),53.7598,-2.7036,7,Preston
+wagamama-preston,Wagamama (Preston),53.7596,-2.7042,7,Preston
+five-guys-southport,Five Guys (Southport),53.6469,-3.0071,7,Southport
+mcdonalds-southport,McDonald's (Southport),53.6475,-3.0080,6,Southport
+nandos-southport,Nando's (Southport),53.6466,-3.0068,7,Southport
+wagamama-southport,Wagamama (Southport),53.6467,-3.0064,7,Southport
+five-guys-warrington,Five Guys (Warrington),53.3913,-2.5960,7,Warrington
+mcdonalds-warrington,McDonald's (Warrington),53.3920,-2.5978,6,Warrington
+nandos-warrington,Nando's (Warrington),53.3910,-2.5964,7,Warrington
+turtle-bay-warrington,Turtle Bay (Warrington),53.3912,-2.5969,7,Warrington
+wagamama-warrington,Wagamama (Warrington),53.3916,-2.5956,7,Warrington

@@ -22,14 +22,7 @@ export default function ReportButton({ id }: { id: string }) {
     setBusy(true);
     try {
       const token = await getIdTokenSafe();
-      await fetch('/api/houseparty/report', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ housepartyId: id, reason: 'spam' }),
-      });
+
       setDone(true);
     } catch {
       // ignore

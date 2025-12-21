@@ -1,1 +1,35 @@
-{"name":"accoweb","private":true,"scripts":{"dev":"next dev","build":"next build","start":"next start","lint":"next lint","deploy:functions":"cd functions && npm run deploy"},"dependencies":{"@vercel/analytics":"^1.5.0","clsx":"^2.1.1","firebase":"^10.12.2","firebase-admin":"^13.5.0","leaflet":"^1.9.4","next":"^14.2.4","react":"^18.3.1","react-dom":"^18.3.1","react-leaflet":"^4.2.1","zod":"3.22"},"devDependencies":{"@types/leaflet":"^1.9.8","@types/node":"^20.11.30","@types/react":"^18.2.66","autoprefixer":"^10.4.19","firebase-tools":"^14.23.0","postcss":"^8.4.38","tailwindcss":"^3.4.4","typescript":"^5.4.5"}}
+{
+	"name": "accoweb",
+	"private": true,
+	"scripts": {
+		"dev": "next dev",
+		"build": "next build",
+		"start": "next start",
+		"lint": "next lint",
+		"deploy:functions": "cd functions && npm run deploy",
+		"import:venues": "node scripts/import_venues.js data/venues.csv"
+	},
+	"dependencies": {
+		"@vercel/analytics": "^1.6.1",
+		"clsx": "^2.1.1",
+		"firebase": "^12.7.0",
+		"firebase-admin": "^13.6.0",
+		"leaflet": "^1.9.4",
+		"next": "^16.0.10",
+		"react": "^19.2.3",
+		"react-dom": "^19.2.3",
+		"react-leaflet": "^5.0.0",
+		"zod": "4.2"
+	},
+	"devDependencies": {
+		"@types/leaflet": "^1.9.21",
+		"@types/node": "^25.0.3",
+		"@types/react": "^19.2.7",
+		"autoprefixer": "^10.4.14",
+		"baseline-browser-mapping": "^2.9.9",
+		"firebase-tools": "^15.0.0",
+		"postcss": "^8.4.31",
+		"tailwindcss": "^3.4.3",
+		"typescript": "^5.9.3"
+	}
+}
