@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useState } from "react";
 
 
 export type UserLocation = { lat: number; lng: number; accuracy?: number } | null;
@@ -26,11 +26,6 @@ export function useUserLocation() {
 			setError(String(e));
 		}
 	};
-
-	useEffect(() => {
-		doRequest();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, []);
 
 	return { loc, error, requestLocation: doRequest };
 }

@@ -73,6 +73,7 @@ node_modules/
 .next/
 out/
 dist/
+*.tsbuildinfo
 *.log
 .env*
 !.env.example

@@ -39,7 +39,7 @@ const cityCenters = {
 async function checkFile(relPath, maxMeters = 10000) {
   const full = path.join(process.cwd(), relPath);
   const content = await fs.readFile(full, 'utf8');
-  const { header, cols, rows } = parseCSV(content);
+  const { rows } = parseCSV(content);
 
   const flagged = [];
   for (const r of rows) {

@@ -1,24 +1,40 @@
 "use client";
 
-import React from 'react';
-import VenueReportButton from './VenueReportButton';
+import { useState } from "react";
+import Link from "next/link";
+import VenueReportButton from "./VenueReportButton";
+import { confidenceLabels, statusLabels, type Confidence, type PopularityStatus, type Trend } from "@/lib/popularity";
 
 type Props = {
   id: string;
   name: string;
   voters: number;
-  heatScore: number;          // 0–100
+  heatScore: number;
   lat: number;
   lng: number;
-  peakToday?: string | null;  // e.g. "21-22"
-  dangerScore?: number; // 0-100
+  rank?: number;
+  peakToday?: string | null;
   price?: number | string | null;
-  reportReasons?: { key: string; label: string }[];
-  reports?: { count: number; entries: { reason: string; createdAt: string }[] };
-  // Optional mode + extra metadata for expanded details
+  reports?: { count: number; entries: unknown[] };
   foodMode?: boolean;
+  confidence?: Confidence;
+  status?: PopularityStatus;
+  forecastIndex?: number;
+  trend?: Trend;
+  distanceMiles?: number | null;
   foodMeta?: { avgPrice?: number; popularDays?: string[] };
   nightMeta?: { popularTimes?: string[]; popularDay?: string };
+  reportReasons?: { key: string; label: string }[];
+  comparisonLabel?: string;
+};
+
+const trendLabels: Record<Trend, string> = { up: "Rising", steady: "Steady", down: "Cooling" };
+const statusStyles: Record<PopularityStatus, string> = {
+  popular: "bg-rose-500/15 text-rose-200 border-rose-400/30",
+  trending: "bg-amber-500/15 text-amber-100 border-amber-400/30",
+  usual: "bg-blue-500/15 text-blue-100 border-blue-400/30",
+  early: "bg-neutral-800 text-neutral-200 border-neutral-700",
+  quiet: "bg-emerald-500/10 text-emerald-100 border-emerald-400/20",
 };
 
 export default function VenueCard({
@@ -28,124 +44,92 @@ export default function VenueCard({
   heatScore,
   lat,
   lng,
+  rank,
   peakToday,
-  dangerScore = 0,
   price = null,
-  reportReasons = undefined,
-  reports = undefined,
+  reports,
   foodMode = false,
+  confidence = "low",
+  status = "early",
+  forecastIndex = 0,
+  trend = "steady",
+  distanceMiles = null,
   foodMeta,
   nightMeta,
+  reportReasons,
+  comparisonLabel = "the selected area",
 }: Props) {
-  const go = () => {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
-      lat + "," + lng
-    )}`;
-    window.open(url, "_blank", "noopener,noreferrer");
-  };
-
-  // expanded state
-  const [expanded, setExpanded] = React.useState(false);
-
-  // click/dblclick handling: use timeout to distinguish single vs double
-  let clickTimer: any = null;
-  const handleClick = (e: React.MouseEvent) => {
-    // start a timer; if dblclick happens, it will clear this
-    clickTimer = setTimeout(() => {
-      setExpanded((s) => !s);
-    }, 220);
-  };
-  const handleDoubleClick = (e: React.MouseEvent) => {
-    if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
-    const target = foodMode ? `/food/vote?venue=${encodeURIComponent(id)}` : `/vote?venue=${encodeURIComponent(id)}`;
-    window.location.href = target;
-  };
+  const [expanded, setExpanded] = useState(false);
+  const voteHref = foodMode ? `/food/vote?venue=${encodeURIComponent(id)}` : `/vote?venue=${encodeURIComponent(id)}`;
+  const directionsHref = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${lat},${lng}`)}`;
+  const detailsId = `venue-details-${id}`;
 
   return (
-    <div onClick={handleClick} onDoubleClick={handleDoubleClick} role="button" tabIndex={0} className={`rounded-xl bg-neutral-900/60 border p-4 flex flex-col gap-2 cursor-pointer ${dangerScore > 60 ? 'border-red-600' : 'border-neutral-800'}`}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h3 className="text-lg font-semibold">{name}</h3>
-          {reports && reports.count > 0 && (
-            <div title={reports.entries.map(e=>`${e.reason} ${e.createdAt?`(${e.createdAt})`:''}`).join('\n')} className="inline-flex items-center gap-1">
-              {Array.from({ length: Math.min(3, reports.count) }).map((_, i) => (
-                <span key={i} className="text-red-400 text-sm" aria-hidden>★</span>
-              ))}
-            </div>
-          )}
+    <article className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-4 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            {rank && <span className="text-sm font-semibold text-yellow-300" aria-label={`Rank ${rank}`}>#{rank}</span>}
+            <h3 className="text-lg font-semibold text-white">{name}</h3>
+            <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusStyles[status]}`}>
+              {statusLabels[status]}
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-neutral-400">
+            {voters === 0 ? "No live votes yet" : `${voters} live ${voters === 1 ? "vote" : "votes"}`}
+            {distanceMiles != null ? ` · ${distanceMiles < 0.1 ? "Nearby" : `${distanceMiles.toFixed(1)} mi away`}` : ""}
+          </p>
         </div>
-        {price !== null && price !== undefined && (
-          <div className="text-sm text-neutral-300">{
-            typeof price === "number" ? (
-              <span>Avg: <span className="font-medium">£{Math.round(price)}</span></span>
-            ) : (
-              price
-            )
-          }</div>
-        )}
-          <div className="flex items-center gap-2">
-          <VenueReportButton id={id} reasons={reportReasons} />
-          <button
-            onClick={go}
-            className="px-3 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-sm"
-          >
-            Navigate
-          </button>
-        </div>
+        {price != null && <p className="text-sm text-neutral-200">Average £{Math.round(Number(price))}</p>}
       </div>
 
-      <div className="w-full h-2 rounded-full bg-neutral-800 overflow-hidden">
-        <div
-          className="h-full bg-gradient-to-r from-lime-400 via-yellow-400 to-red-500"
-          style={{ width: `${Math.max(0, Math.min(100, heatScore))}%` }}
-        />
+      <div className="mt-4">
+        <div className="mb-1 flex items-center justify-between gap-3 text-xs text-neutral-400">
+          <span>Live popularity index</span>
+          <span className="font-semibold tabular-nums text-white">{heatScore}/100</span>
+        </div>
+        <meter className="popularity-meter h-3 w-full" min="0" max="100" value={heatScore} aria-label={`${name} live popularity index ${heatScore} out of 100`} />
       </div>
 
-      {dangerScore > 0 && (
-        <div className="w-full h-2 rounded-full bg-neutral-800 overflow-hidden mt-2">
-          <div className="h-full bg-red-600" style={{ width: `${Math.max(0, Math.min(100, dangerScore))}%` }} />
-        </div>
+      <dl className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+        <div><dt className="text-neutral-500">Forecast</dt><dd className="font-medium text-neutral-200">{forecastIndex}/100</dd></div>
+        <div><dt className="text-neutral-500">Signal</dt><dd className="font-medium text-neutral-200">{trendLabels[trend]}</dd></div>
+        <div><dt className="text-neutral-500">Confidence</dt><dd className="font-medium text-neutral-200">{confidenceLabels[confidence].replace(" confidence", "")}</dd></div>
+        <div><dt className="text-neutral-500">Expected peak</dt><dd className="font-medium text-neutral-200">{peakToday || "Not known yet"}</dd></div>
+      </dl>
+
+      {reports && reports.count > 0 && (
+        <p className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-100" role="note">
+          {reports.count} community safety {reports.count === 1 ? "report" : "reports"} today. Use your own judgement.
+        </p>
       )}
 
-      <div className="text-sm text-neutral-400">
-        {voters} {voters === 1 ? "vote" : "votes"}
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link href={voteHref} className="inline-flex min-h-11 items-center rounded-lg bg-yellow-400 px-3 text-sm font-semibold text-black hover:bg-yellow-300">
+          Vote here
+        </Link>
+        <a href={directionsHref} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-lg border border-neutral-700 bg-neutral-800 px-3 text-sm text-white hover:bg-neutral-700">
+          Directions<span className="sr-only"> to {name}, opens in a new tab</span>
+        </a>
+        <button type="button" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded} aria-controls={detailsId} className="min-h-11 rounded-lg border border-neutral-700 px-3 text-sm text-white hover:bg-neutral-800">
+          {expanded ? "Hide details" : "More details"}
+        </button>
+        <VenueReportButton id={id} reasons={reportReasons} />
       </div>
 
-      <div className="text-xs text-neutral-400">
-        {peakToday ? (
-          <>Peak tonight: <span className="text-neutral-200 font-medium">{peakToday}</span></>
-        ) : (
-          <>Peak tonight: <span className="text-neutral-500">—</span></>
-        )}
-      </div>
-      
-      {/* Expanded details area */}
       {expanded && (
-        <div className="mt-3 p-3 rounded bg-neutral-900/70 border border-neutral-800 text-sm text-neutral-300">
+        <div id={detailsId} className="mt-4 rounded-xl border border-neutral-800 bg-neutral-950/70 p-3 text-sm text-neutral-300">
           {foodMode ? (
-            <div className="space-y-2">
-              <div>Average price: <span className="font-medium text-neutral-100">{foodMeta?.avgPrice ? `£${Math.round(foodMeta.avgPrice)}` : (typeof price === 'number' ? `£${Math.round(price)}` : (price ?? '—'))}</span></div>
-              <div>Popular days: <span className="font-medium text-neutral-100">{(foodMeta?.popularDays && foodMeta.popularDays.length > 0) ? foodMeta.popularDays.join(', ') : '—'}</span></div>
-              <div>Votes: <span className="font-medium text-neutral-100">{voters}</span></div>
-            </div>
+            <p>Historical average price: <strong>{foodMeta?.avgPrice ? `£${Math.round(foodMeta.avgPrice)}` : "Not enough data"}</strong></p>
           ) : (
-            <div className="space-y-2">
-              <div>Most popular day: <span className="font-medium text-neutral-100">{nightMeta?.popularDay ?? '—'}</span></div>
-              <div>Popular times: <span className="font-medium text-neutral-100">{(nightMeta?.popularTimes && nightMeta.popularTimes.length > 0) ? nightMeta.popularTimes.join(', ') : '—'}</span></div>
-              <div>Weekly popularity: <span className="font-medium text-neutral-100">{heatScore}%</span></div>
-            </div>
+            <>
+              <p>Typical busy period: <strong>{nightMeta?.popularDay || peakToday || "Not enough data"}</strong></p>
+              <p className="mt-1">Recent popular times: <strong>{nightMeta?.popularTimes?.length ? nightMeta.popularTimes.join(", ") : "Not enough data"}</strong></p>
+            </>
           )}
-          <div className="mt-2 text-xs text-neutral-500">Double-click to open vote page for this venue.</div>
+          <p className="mt-2 text-xs text-neutral-500">The index is relative to other {comparisonLabel}. It is not a probability.</p>
         </div>
       )}
-      <div className="flex items-center justify-between mt-2">
-        <div />
-        {dangerScore > 60 ? (
-          <div className="text-xs text-red-300 font-semibold">Danger</div>
-        ) : dangerScore > 0 ? (
-          <div className="text-xs text-yellow-300">Caution</div>
-        ) : null}
-      </div>
-    </div>
+    </article>
   );
 }

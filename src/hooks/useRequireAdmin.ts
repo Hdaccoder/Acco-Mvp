@@ -1,13 +1,16 @@
-// src/hooks/useRequireAdmin.ts
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import type { User } from 'firebase/auth';
-import { onAuthStateChanged } from 'firebase/auth';
-import { getClientAuth } from '@/lib/firebase';
+import { useEffect, useState } from "react";
+import type { User } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
+import { getClientAuth } from "@/lib/firebase";
 
-// 🔐 Only this email is allowed to use the admin tools.
-const ADMIN_EMAIL = 'paul.is.in.power@gmail.com';
+const adminEmails = new Set(
+  (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean),
+);
 
 export function useRequireAdmin() {
   const [user, setUser] = useState<User | null>(null);
@@ -15,22 +18,13 @@ export function useRequireAdmin() {
 
   useEffect(() => {
     const auth = getClientAuth();
-
-    const unsub = onAuthStateChanged(auth, (u) => {
-      console.log('[admin] auth state changed. User:', u?.email ?? 'none');
-      setUser(u);
+    const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
+      setUser(nextUser);
       setLoading(false);
     });
-
-    return () => unsub();
+    return unsubscribe;
   }, []);
 
-  const isAdmin =
-    !!user &&
-    !!user.email &&
-    user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-
-  console.log('[admin] isAdmin:', isAdmin);
-
+  const isAdmin = Boolean(user?.email && adminEmails.has(user.email.toLowerCase()));
   return { user, loading, isAdmin };
 }

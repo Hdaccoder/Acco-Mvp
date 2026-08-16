@@ -1,67 +1,37 @@
-// src/app/api/ensure-summary/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from '@/lib/firebase-admin';
-import { Timestamp } from "firebase-admin/firestore";
-import { generatePredictionForNight, writePrediction, nightKey } from '@/lib/predictions';
+import { hasCronSecret } from "@/lib/api-security";
+import { ensurePredictionForNight, generatePredictionForNight } from "@/lib/predictions";
+import { nightKey, nightKeyAtOffset } from "@/lib/dates";
 
-type Vote = {
-  intent: "yes" | "maybe" | "no";
-  selections?: { venueId: string; arrivalWindow?: string }[];
-  lastEditedAt?: Timestamp;
-};
-
-function addDays(d: Date, delta: number) {
-  const copy = new Date(d);
-  copy.setDate(copy.getDate() + delta);
-  return copy;
-}
-function weekdayIndex(d: Date) {
-  // 0=Sun ... 6=Sat
-  return d.getDay();
-}
-
-const CRON_SECRET = process.env.CRON_SECRET || "";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
+  if (!hasCronSecret(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    // --------- security -----------
-    const url = new URL(req.url);
-    const key = url.searchParams.get("key");
-    if (!CRON_SECRET || key !== CRON_SECRET) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Optional query:
-    //   for=YYYYMMDD  (generate prediction for a specific night)
-    //   backfill=N    (generate last N nights)
-    //   dryRun=1      (don’t write)
-    const forParam = url.searchParams.get("for");
-    const backfill = Number(url.searchParams.get("backfill") || 0);
-    const dryRun = url.searchParams.get("dryRun") === "1";
-
-    if (backfill > 0) {
-      const today = new Date();
-      const outputs: string[] = [];
-      for (let i = backfill; i >= 1; i--) {
-        const date = addDays(today, -i);
-        const nk = nightKey(date);
-        const res = await generatePredictionForNight(nk);
-        outputs.push(`${nk}:${res.top?.[0] ?? "none"}`);
-        if (!dryRun) await writePrediction(nk, res);
+    const requested = req.nextUrl.searchParams.get("for");
+    const backfill = Math.min(30, Math.max(0, Number(req.nextUrl.searchParams.get("backfill") || 0)));
+    const dryRun = req.nextUrl.searchParams.get("dryRun") === "1";
+    const keys = backfill
+      ? Array.from({ length: backfill }, (_, index) => nightKeyAtOffset(index - backfill))
+      : [requested && /^\d{8}$/.test(requested) ? requested : nightKey()];
+    const generated: string[] = [];
+    const reused: string[] = [];
+    const generating: string[] = [];
+    for (const key of keys) {
+      if (dryRun) {
+        await generatePredictionForNight(key);
+        generated.push(key);
+        continue;
       }
-      return NextResponse.json({ ok: true, backfilled: outputs, dryRun });
+      const ensured = await ensurePredictionForNight(key, "nightlife");
+      if (ensured.status === "generating") generating.push(key);
+      else if (ensured.generatedOnDemand) generated.push(key);
+      else reused.push(key);
     }
-
-    const targetKey = forParam || nightKey(addDays(new Date(), 0)); // default = today/tonight
-    const out = await generatePredictionForNight(targetKey);
-
-    if (!dryRun) await writePrediction(targetKey, out);
-
-    return NextResponse.json({ ok: true, targetKey, dryRun, out });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? "Internal error" }, { status: 500 });
+    return NextResponse.json({ ok: true, generated, reused, generating, dryRun });
+  } catch (error) {
+    console.error("[GET /api/ensure-summary]", error);
+    return NextResponse.json({ error: "Unable to generate forecast." }, { status: 500 });
   }
 }
-
-/** Reads past nights and generates a per-venue prediction (0–100) + typical peak. */
-// generation logic moved to src/lib/predictions.ts

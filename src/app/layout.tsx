@@ -1,143 +1,72 @@
-// src/app/layout.tsx
-import "./globals.css";
-import Link from "next/link";
+﻿import "./globals.css";
 import FoodNightlifeToggle from "@/components/FoodNightlifeToggle";
 import NavLinks from "@/components/NavLinks";
 import TopBrandLink from "@/components/TopBrandLink";
-import type { Metadata } from "next";
+import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
+import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/react";
 import Script from "next/script";
 
 export const metadata: Metadata = {
-  title: "Acco — Tonight in Ormskirk",
-  // keep generic metadata title; the page itself will display the user's city where available
-  description: "See which bars & clubs are hot tonight based on real votes.",
+  title: { default: "Acco — Popular near you", template: "%s · Acco" },
+  description: "See what is popular near you now and what is forecast to be busy later.",
   manifest: "/manifest.webmanifest",
-  icons: {
-    icon: "/icons/icon-192.png",
-    apple: "/icons/icon-192.png",
-  },
-  themeColor: "#0a0a0a",
+  icons: { icon: "/icons/icon-192.png", apple: "/icons/icon-192.png" },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  // ---- AdSense config via envs ----
-  const ADS_PUB = process.env.NEXT_PUBLIC_ADSENSE_PUB ?? "";
-  const LEFT_SLOT = process.env.NEXT_PUBLIC_ADSENSE_LEFT_SLOT ?? "";
-  const RIGHT_SLOT = process.env.NEXT_PUBLIC_ADSENSE_RIGHT_SLOT ?? "";
+export const viewport: Viewport = { themeColor: "#0a0a0a", colorScheme: "dark" };
 
-  // Pre-baked "mailto" with a short issue template
-  const issuesHref =
-    "mailto:paul.is.in.power@gmail.com" +
-    "?subject=" +
-    encodeURIComponent("Acco issue") +
-    "&body=" +
-    encodeURIComponent(
-      [
-        "Describe the problem:",
-        "",
-        "Steps to reproduce:",
-        "",
-        "What I expected to happen:",
-        "",
-        "Device/Browser (optional):",
-        "",
-        "Screenshot link (optional):",
-        "",
-      ].join("\n")
-    );
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const adsPublisher = process.env.NEXT_PUBLIC_ADSENSE_PUB || "";
+  const leftSlot = process.env.NEXT_PUBLIC_ADSENSE_LEFT_SLOT || "";
+  const rightSlot = process.env.NEXT_PUBLIC_ADSENSE_RIGHT_SLOT || "";
+  const showAds = Boolean(adsPublisher && adsPublisher !== "ca-pub-0000000000000000");
+  const issuesHref = `mailto:paul.is.in.power@gmail.com?subject=${encodeURIComponent("Acco issue")}&body=${encodeURIComponent("Describe the problem:\n\nSteps to reproduce:\n\nWhat I expected:\n\nDevice and browser:\n")}`;
 
   return (
     <html lang="en">
       <head>
-        {/* --- Google AdSense loader (site-wide) --- */}
-        {ADS_PUB && ADS_PUB !== 'ca-pub-0000000000000000' && (
-          <Script
-            id="adsbygoogle-loader"
-            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADS_PUB}`}
-            strategy="afterInteractive"
-            async
-            crossOrigin="anonymous"
-          />
-        )}
+        {showAds && <Script id="adsbygoogle-loader" src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsPublisher}`} strategy="lazyOnload" async crossOrigin="anonymous" />}
       </head>
-
-      <body className="min-h-screen bg-neutral-950 text-white">
-        {/* Top nav */}
-        <header className="sticky top-0 z-20 backdrop-blur bg-neutral-950/70 border-b border-neutral-900">
-          <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-            {/* Client component decides whether to link to / or /food based on path */}
-            <TopBrandLink />
-
-            <nav className="flex items-center gap-4 text-sm text-neutral-300">
-              <FoodNightlifeToggle />
-              <NavLinks issuesHref={issuesHref} />
-            </nav>
+      <body className="min-h-screen bg-neutral-950 text-white antialiased">
+        <a href="#main-content" className="skip-link">Skip to main content</a>
+        <header className="sticky top-0 z-20 border-b border-neutral-900 bg-neutral-950/90 backdrop-blur">
+          <div className="mx-auto max-w-4xl px-4 py-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-2 sm:justify-between">
+                <TopBrandLink />
+                <FoodNightlifeToggle />
+              </div>
+              <nav aria-label="Primary navigation" className="flex flex-wrap items-center gap-2 text-sm text-neutral-300 sm:justify-end sm:gap-4">
+                <NavLinks issuesHref={issuesHref} />
+              </nav>
+            </div>
           </div>
         </header>
 
-        {/* --- Side rails (hidden on <xl). 
-             We keep them OUTSIDE the max-width container so they sit at the edges. --- */}
-        {ADS_PUB && (
+        {showAds && (
           <>
-            {/* Left rail */}
-            <aside className="hidden xl:block fixed top-24 left-4 z-10">
-              <ins
-                className="adsbygoogle"
-                style={{ display: "block", width: 160, height: 600 }}
-                data-ad-client={ADS_PUB}
-                data-ad-slot={LEFT_SLOT}
-                data-ad-format="vertical"
-                data-full-width-responsive="false"
-              />
-              {/* AdSense needs a push() after the ins appears */}
-              <Script id="ads-left-push" strategy="afterInteractive">
-                {`(function(){try{const el=document.querySelector('ins[data-ad-slot="${LEFT_SLOT}"]'); if(el && el.clientWidth>0){(window.adsbygoogle=window.adsbygoogle||[]).push({});}}catch(e){/* ignore */}})();`}
-              </Script>
+            <aside aria-label="Advertisement" className="fixed left-4 top-24 z-10 hidden h-[600px] w-[160px] xl:block">
+              <ins className="adsbygoogle block h-[600px] w-[160px]" data-ad-client={adsPublisher} data-ad-slot={leftSlot} data-ad-format="vertical" data-full-width-responsive="false" />
             </aside>
-
-            {/* Right rail */}
-            <aside className="hidden xl:block fixed top-24 right-4 z-10">
-              <ins
-                className="adsbygoogle"
-                style={{ display: "block", width: 160, height: 600 }}
-                data-ad-client={ADS_PUB}
-                data-ad-slot={RIGHT_SLOT}
-                data-ad-format="vertical"
-                data-full-width-responsive="false"
-              />
-              <Script id="ads-right-push" strategy="afterInteractive">
-                {`(function(){try{const el=document.querySelector('ins[data-ad-slot="${RIGHT_SLOT}"]'); if(el && el.clientWidth>0){(window.adsbygoogle=window.adsbygoogle||[]).push({});}}catch(e){/* ignore */}})();`}
-              </Script>
+            <aside aria-label="Advertisement" className="fixed right-4 top-24 z-10 hidden h-[600px] w-[160px] xl:block">
+              <ins className="adsbygoogle block h-[600px] w-[160px]" data-ad-client={adsPublisher} data-ad-slot={rightSlot} data-ad-format="vertical" data-full-width-responsive="false" />
             </aside>
           </>
         )}
 
-        {/* Page content (kept at 3xl so side rails have space on xl screens) */}
-        <main className="max-w-3xl mx-auto px-4 py-5">{children}</main>
-
-        {/* Footer */}
-        <footer className="border-t border-neutral-900 text-neutral-400 text-xs">
-          <div className="max-w-3xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
-            <span>© {new Date().getFullYear()} Paul In Power</span>
+        <main id="main-content" tabIndex={-1} className="mx-auto min-h-[70vh] max-w-4xl px-4 py-6 sm:py-8">{children}</main>
+        <footer className="border-t border-neutral-900 text-xs text-neutral-400">
+          <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-5">
+            <span>© {new Date().getFullYear()} Acco</span>
             <div className="flex items-center gap-4">
-
-              <a href={issuesHref} className="hover:text-white">
-                Report an issue
-              </a>
+              <a href="/privacy" className="hover:text-white">Privacy</a>
+              <a href="/terms" className="hover:text-white">Terms</a>
+              <a href={issuesHref} className="hover:text-white">Report an issue</a>
             </div>
           </div>
         </footer>
-
-        {/* In development, unregister any previously-registered service workers so cached CSS doesn't persist. */}
-        <Script id="dev-unregister-sw" strategy="afterInteractive">
-          {`(function(){try{if(location.hostname==='localhost'||location.hostname==='127.0.0.1'){navigator.serviceWorker.getRegistrations().then(r=>r.forEach(reg=>reg.unregister())).then(()=>{console.log('dev: unregistered service workers');try{var links=document.querySelectorAll('link[rel=stylesheet]');links.forEach(l=>{var href=l.href; if(href && href.indexOf('?_sw')===-1){l.href=href+ (href.indexOf('?')===-1? '?_sw=' : '&_sw=') + Date.now();}});}catch(e){}});}}catch(e){/* ignore */}})()`}
-        </Script>
-
+        <ServiceWorkerRegistration />
         <Analytics />
       </body>
     </html>

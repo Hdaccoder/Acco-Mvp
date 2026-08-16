@@ -88,7 +88,7 @@ async function ensureDir(dir){ try{ await fs.mkdir(dir, { recursive:true }); }ca
 async function runOne(cleanCsvPath, outCsvPath, reportPath){
   const full = path.join(process.cwd(), cleanCsvPath);
   const content = await fs.readFile(full, 'utf8');
-  const { header, cols, rows } = (parseCSV(content));
+  const { cols, rows } = parseCSV(content);
 
   // group cities
   const cities = {};

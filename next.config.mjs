@@ -1,23 +1,19 @@
-import { dirname } from 'path';
-import { fileURLToPath } from 'url';
-
-/** @type {import('next').NextConfig} */
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
-
+﻿/** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    turbo: false,
     optimizePackageImports: ["react-leaflet", "leaflet"],
   },
-	async headers() {
-		return [
-			{
-				source: "/(.*)",
-				headers: [{ key: "Permissions-Policy", value: "geolocation=(self)" }],
-			},
-		];
-	},
+  async headers() {
+    return [{
+      source: "/(.*)",
+      headers: [
+        { key: "Permissions-Policy", value: "geolocation=(self)" },
+        { key: "X-Content-Type-Options", value: "nosniff" },
+        { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        { key: "X-Frame-Options", value: "DENY" },
+      ],
+    }];
+  },
 };
 
 export default nextConfig;

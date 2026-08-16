@@ -38,7 +38,7 @@ export const VENUES: Venue[] = [
   { id: "cavern-club", name: "Cavern Club", lat: 53.408371, lng: -2.991573, baseline: 8, city: "Liverpool" },
   { id: "concert-square", name: "Concert Square", lat: 53.4039, lng: -2.9845, baseline: 9, city: "Liverpool" },
   { id: "heebie-jeebies", name: "Heebie Jeebies", lat: 53.4032, lng: -2.9853, baseline: 7, city: "Liverpool" },
-  { id: "mccooleys-matthew-st", name: "Mccooley’s Matthew Street", lat: 53.409, lng: -2.9918, baseline: 7, city: "Liverpool" },
+  { id: "mccooleys-matthew-st", name: "McCooley’s Matthew Street", lat: 53.409, lng: -2.9918, baseline: 7, city: "Liverpool" },
   { id: "mojo-liverpool", name: "MOJO Liverpool", lat: 53.4046, lng: -2.9862, baseline: 7, city: "Liverpool" },
   { id: "the-raz", name: "The Raz", lat: 53.4042, lng: -2.9869, baseline: 7, city: "Liverpool" },
   { id: "the-merchant", name: "The Merchant", lat: 53.4029, lng: -2.9841, baseline: 7, city: "Liverpool" },

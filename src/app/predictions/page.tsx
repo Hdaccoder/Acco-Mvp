@@ -1,8 +1,6 @@
-// src/app/predictions/page.tsx
-"use client";
-
-import PredictionsClient from "./PredictionsClient";
+﻿import PredictionExplorer from "@/components/PredictionExplorer";
+import { VENUES } from "@/lib/venues";
 
 export default function PredictionsPage() {
-  return <PredictionsClient />;
+  return <PredictionExplorer mode="nightlife" venues={VENUES} />;
 }
