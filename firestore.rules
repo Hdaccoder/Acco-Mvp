@@ -13,111 +13,27 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Allow null, else minimal lat/lng/accuracy checks
-    function validLocation(loc) {
-      return loc == null ||
-        (
-          loc is map &&
-          loc.lat is number && loc.lat >= -90 && loc.lat <= 90 &&
-          loc.lng is number && loc.lng >= -180 && loc.lng <= 180 &&
-          (loc.accuracy == null || loc.accuracy is number)
-        );
-    }
-
-    // One selection entry inside a vote
-    function validSelection(sel) {
-      // Only validate arrivalWindow if the field is present to avoid
-      // runtime errors when clients omit the key (or send undefined).
-      return sel is map &&
-             sel.venueId is string &&
-             (
-               // if arrivalWindow key exists, it must be null or string
-               (sel.keys().hasAny(['arrivalWindow']) ? (sel.arrivalWindow == null || sel.arrivalWindow is string) : true)
-             );
-    }
-
-    // Non-recursive validator for selections list (supports up to 8)
-    function validSelections(arr) {
-      return arr is list &&
-        (arr.size() >= 1 && arr.size() <= 8) &&
-        validSelection(arr[0]) &&
-        (
-          arr.size() == 1 ||
-          (validSelection(arr[1]) &&
-            (
-              arr.size() == 2 ||
-              (validSelection(arr[2]) &&
-                (
-                  arr.size() == 3 ||
-                  (validSelection(arr[3]) &&
-                    (
-                      arr.size() == 4 ||
-                      (validSelection(arr[4]) &&
-                        (
-                          arr.size() == 5 ||
-                          (validSelection(arr[5]) &&
-                            (
-                              arr.size() == 6 ||
-                              (validSelection(arr[6]) &&
-                                (
-                                  arr.size() == 7 ||
-                                  (validSelection(arr[7]) && arr.size() == 8)
-                                )
-                              )
-                            )
-                          )
-                        )
-                      )
-                    )
-                  )
-                )
-              )
-            )
-          )
-        );
-    }
-
-    // Validate the vote document shape and ownership
-    function validVote(doc, userId) {
-      return
-        // required base fields
-        doc is map &&
-        doc.userId is string &&
-        doc.nightKey is string &&
-        doc.createdAt is timestamp &&
-        // owned by caller
-        (isSignedIn() && request.auth.uid == userId && doc.userId == userId) &&
-        // selections
-        (doc.selections is list && validSelections(doc.selections)) &&
-        // optional fields: only validate location if present
-        (doc.keys().hasAny(['location']) ? validLocation(doc.location) : true) &&
-        (
-          doc.intent == null || (doc.intent in ['yes','maybe','no'])
-        );
-    }
-
     // -------------------------------------------------
     // Votes: /nights/{date}/votes/{userId}
     // -------------------------------------------------
     match /nights/{date}/votes/{userId} {
       // Public reads for the Tonight page / user own history
-      allow read: if true;
+      allow read: if isSelf(userId);
 
-      // Users may write ONLY their own vote docs and only valid shapes
-      allow create, update: if isSelf(userId) &&
-                            validVote(request.resource.data, userId);
-
-      // No client deletes (keeps history stable)
-      allow delete: if false;
+      // Votes are written only by /api/vote/submit with the Firebase Admin
+      // SDK. Never permit direct browser writes: a custom client could
+      // otherwise bypass API validation and rate limits.
+      // Admin SDK writes are not restricted by Firestore Security Rules.
+      allow create, update, delete: if false;
     }
 
     // -------------------------------------------------
     // Food votes mirror nightlife votes: /food_nights/{date}/votes/{userId}
     // -------------------------------------------------
     match /food_nights/{date}/votes/{userId} {
-      allow read: if true;
-      allow create, update: if isSelf(userId) && validVote(request.resource.data, userId);
-      allow delete: if false;
+      allow read: if isSelf(userId);
+      // Food votes use the same server-only write path as nightlife votes.
+      allow create, update, delete: if false;
     }
 
     // -------------------------------------------------
